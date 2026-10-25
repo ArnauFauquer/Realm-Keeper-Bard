@@ -1,6 +1,6 @@
 """Motor de imagen local: los modelos corren dentro del proceso con diffusers.
 
-Sustituye a ComfyUI desde el 25 oct 2026 (y este, a Nano Banana/Gemini):
+Sin servicios externos:
 - Crear: Krea 2 Turbo (GGUF Q4), el que mejor clava el estilo de la app.
 - Transformar / editar / preparar para 3D: FLUX 3 Image Klein (GGUF Q8), el que
   mejor conserva el original al editar con imágenes de referencia.
@@ -90,9 +90,9 @@ class LocalEngine:
         transformer = Krea2Transformer2DModel.from_single_file(
             str(KREA_GGUF), config=KREA_REPO, subfolder="transformer",
             quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
-            torch_dtype=torch.bfloat16,
+            dtype=torch.bfloat16,
         )
-        pipe = Krea2Pipeline.from_pretrained(KREA_REPO, transformer=transformer, torch_dtype=torch.bfloat16)
+        pipe = Krea2Pipeline.from_pretrained(KREA_REPO, transformer=transformer, dtype=torch.bfloat16)
         if OFFLOAD == "model":
             pipe.enable_model_cpu_offload()
         else:
@@ -108,14 +108,15 @@ class LocalEngine:
         transformer = Flux3Transformer2DModel.from_single_file(
             str(FLUX3_GGUF), config=FLUX3_REPO, subfolder="transformer",
             quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
-            torch_dtype=torch.bfloat16,
+            dtype=torch.bfloat16,
         )
         manager = None
         if OFFLOAD == "model":
             manager = ComponentsManager()
             manager.enable_auto_cpu_offload(device="cuda")
         pipe = ModularPipeline.from_pretrained(FLUX3_REPO, components_manager=manager)
-        pipe.load_components(names=["text_encoder", "tokenizer", "vae"], torch_dtype=torch.bfloat16)
+        pipe.load_components(names=[n for n in pipe.pretrained_component_names if n != "transformer"],
+                            dtype=torch.bfloat16)
         pipe.update_components(transformer=transformer)
         if OFFLOAD != "model":
             for module in (pipe.text_encoder, pipe.transformer, pipe.vae):

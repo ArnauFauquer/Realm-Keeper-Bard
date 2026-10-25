@@ -10,9 +10,7 @@ RUN npm run build
 FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    HF_HOME=/cache/huggingface \
-    U2NET_HOME=/cache/u2net \
-    MODELS_DIR=/models
+    DATA_DIR=/data
 WORKDIR /app
 
 # PyTorch con CUDA 12.8 (trae sus propias librerías CUDA; basta el driver del host)
@@ -22,7 +20,6 @@ RUN pip install -r requirements.txt
 
 COPY main.py ./
 COPY app/ app/
-COPY referencias/ referencias/
 COPY --from=web /web/dist web/dist
 
 EXPOSE 8765

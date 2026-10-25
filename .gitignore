@@ -10,25 +10,16 @@ __pycache__/
 web/node_modules/
 web/dist/
 
-# Datos generados por la app (se montan como volúmenes en Docker)
-generated_images/
-generated_transparent/
-generated_3d/
-uploads/
-.thumbs/
-world_style.json
+# Datos de la app (volumen /data en Docker): solo se versionan las referencias canon
+data/*
+!data/referencias/
 *.log
-
-# Pesos de los modelos de imagen (GGUF) y caché de Hugging Face
-models/
-.cache/
 
 # Entorno 3D (pesado, se crea con setup_3d.ps1)
 models_3d/venv/
 models_3d/trellis/
 models_3d/weights/
 models_3d/test/
-models_3d/*.log
 
 # Editor / sistema
 .vscode/

@@ -3,7 +3,7 @@ sirve el frontend de navegador ya compilado (web/dist).
 
 Cada generación entra en una cola (/api/jobs la lista entera): las que usan la
 GPU (crear, transformar, 3D) van de una en una por la misma fila y quitar fondo
-por otra aparte, para que no espere detrás de un modelo 3D. Las imágenes se referencian por su ruta relativa a BASE_DIR
+por otra aparte, para que no espere detrás de un modelo 3D. Las imágenes se referencian por su ruta relativa a DATA_DIR
 ("generated_images/x.png") y solo se sirven/abren las de ALLOWED_ROOTS.
 """
 
@@ -24,7 +24,9 @@ from PIL import Image
 from pydantic import BaseModel, Field
 
 from .background_removal import remove_background
-from .config import BASE_DIR, MODELS_3D_OUTPUT_DIR, OUTPUT_DIR, TRANSPARENT_DIR
+from .config import (
+    BASE_DIR, DATA_DIR, MODELS_3D_OUTPUT_DIR, OUTPUT_DIR, REFERENCES_DIR, THUMB_DIR, TRANSPARENT_DIR, UPLOAD_DIR,
+)
 from .generation import (
     generate_create,
     generate_transform,
@@ -44,10 +46,6 @@ from .mesh_generation import (
 )
 from .style_profile import CATEGORIES, StyleLibrary, load_style_library, save_style_library
 
-UPLOAD_DIR = BASE_DIR / "uploads"
-THUMB_DIR = BASE_DIR / ".thumbs"
-UPLOAD_DIR.mkdir(exist_ok=True)
-THUMB_DIR.mkdir(exist_ok=True)
 WEB_DIST = BASE_DIR / "web" / "dist"
 
 ALLOWED_ROOTS = {
@@ -55,20 +53,20 @@ ALLOWED_ROOTS = {
     "generated_transparent": TRANSPARENT_DIR,
     "generated_3d": MODELS_3D_OUTPUT_DIR,
     "uploads": UPLOAD_DIR,
-    "referencias": BASE_DIR / "referencias",
+    "referencias": REFERENCES_DIR,
 }
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
-LIBRARY_FOLDERS = {"images": OUTPUT_DIR, "transparent": TRANSPARENT_DIR, "references": BASE_DIR / "referencias"}
+LIBRARY_FOLDERS = {"images": OUTPUT_DIR, "transparent": TRANSPARENT_DIR, "references": REFERENCES_DIR}
 
 
 # --------------------------------------------------------------- rutas
 def to_rel(path: str | Path) -> str:
-    return Path(path).resolve().relative_to(BASE_DIR).as_posix()
+    return Path(path).resolve().relative_to(DATA_DIR.resolve()).as_posix()
 
 
 def resolve_rel(rel: str) -> Path:
     """Ruta relativa del frontend -> ruta absoluta, solo dentro de ALLOWED_ROOTS."""
-    path = (BASE_DIR / rel).resolve()
+    path = (DATA_DIR / rel).resolve()
     for root in ALLOWED_ROOTS.values():
         if path == root.resolve() or root.resolve() in path.parents:
             return path

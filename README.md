@@ -18,14 +18,16 @@ Los modelos de imagen corren dentro de la app con
 |---|---|
 | `app/` | Backend FastAPI (`server.py`), motor de imagen (`local_engine.py`), prompts y perfil de estilo |
 | `web/` | Frontend React + Vite + Tailwind; se compila a `web/dist` y lo sirve el backend |
-| `referencias/` | Imágenes canon de las especies (anclas de estilo) |
-| `models/` | Pesos GGUF de los transformers (no se versionan) |
+| `data/` | Todo lo que no es código (en Docker, el volumen `/data`) |
+| `data/referencias/` | Imágenes canon de las especies (anclas de estilo; las únicas versionadas) |
+| `data/models/` | Pesos GGUF de los transformers |
+| `data/world_style.json` | Perfil de estilo del mundo (lo edita la app) |
+| `data/generated_*`, `data/uploads/`, `data/thumbs/`, `data/cache/` | Resultados, subidas, miniaturas y cachés de Hugging Face / rembg |
 | `models_3d/` | Entorno aparte para imagen → 3D (`setup_3d.ps1`) |
-| `world_style.json` | Perfil de estilo del mundo (lo edita la app) |
 
 ## Pesos de los modelos
 
-Copia en `models/`:
+Copia en `data/models/`:
 
 - `krea2_turbo-Q4_K_M.gguf`
 - `flux-3-image-klein-Q8_0.gguf` ([unsloth/flux-3-image-klein-GGUF](https://huggingface.co/unsloth/flux-3-image-klein-GGUF))
@@ -47,9 +49,8 @@ cp .env.example .env
 docker compose up --build
 ```
 
-La app queda en <http://localhost:8765>. Las imágenes generadas, subidas y el
-perfil de estilo viven en carpetas del proyecto montadas como volúmenes; la caché
-de Hugging Face y rembg en `.cache/`.
+La app queda en <http://localhost:8765>. Todos los datos viven en `data/`, montado
+como único volumen en `/data` (se puede cambiar con `DATA_DIR`).
 
 ## Arrancar sin Docker
 

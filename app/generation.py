@@ -1,8 +1,7 @@
 """Generación y transformación de imágenes con el motor local (local_engine.py).
 
 Crear usa Krea 2 (solo texto); transformar y preparar para 3D usan FLUX 3 Image
-Klein con las imágenes como referencia. Hasta el 25 oct 2026 todo iba con Nano
-Banana 2.1 (Gemini); los prompts se mantienen, ya en inglés.
+Klein con las imágenes como referencia. Los prompts van en inglés.
 """
 
 from .local_engine import LocalEngine
@@ -43,7 +42,7 @@ def build_create_prompt(
     profile: StyleProfile, category: str, description: str, species_ref: bool = False,
     use_species: bool = False,
 ) -> str:
-    """Estructura recomendada para Nano Banana 2 (consistencia de estilo):
+    """Estructura del prompt (consistencia de estilo):
     sujeto -> encuadre/punto de vista -> estilo -> restricciones, cada bloque
     corto y separado en vez de un único párrafo largo.
     """

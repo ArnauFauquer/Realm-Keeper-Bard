@@ -6,17 +6,9 @@ services:
       - "127.0.0.1:8765:8765"
     env_file: .env
     volumes:
-      # pesos GGUF (Krea 2, FLUX 3 Klein) y caché de Hugging Face / rembg
-      - ./models:/models:ro
-      - ./.cache:/cache
-      # datos de la app: sobreviven a reconstruir la imagen
-      - ./generated_images:/app/generated_images
-      - ./generated_transparent:/app/generated_transparent
-      - ./generated_3d:/app/generated_3d
-      - ./uploads:/app/uploads
-      - ./referencias:/app/referencias
-      - ./.thumbs:/app/.thumbs
-      - ./world_style.json:/app/world_style.json
+      # todo lo que no es código: imágenes generadas, subidas, referencias,
+      # perfil de estilo, pesos GGUF (models/) y cachés de Hugging Face / rembg
+      - ./data:/data
     deploy:
       resources:
         reservations:

@@ -12,13 +12,12 @@ import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from .config import BASE_DIR, STYLE_PATH
+from .config import DATA_DIR, STYLE_PATH
 
 CATEGORIES = ("personaje", "fondo", "objeto", "mapa")
 
 # Descriptor de estilo fijo: se repite EXACTAMENTE igual en cada generación
-# (recomendación de Nano Banana 2 para consistencia — ver referencias en
-# generation.py). Contorno grueso y limpio con pocas líneas internas (esto
+# (consistencia entre generaciones). Contorno grueso y limpio con pocas líneas internas (esto
 # es lo que el usuario pidió y validó). Respecto a la versión anterior, se
 # sustituyen los brillos planos tipo "pegatina" por un degradado de luz más
 # suave y continuo, y se recupera algo de matiz en la cara.
@@ -109,7 +108,7 @@ DEFAULT_SPECIES_PROMPT = (
 )
 
 # Imagen ancla de la especie: se adjunta como segunda referencia para que el
-# modelo vea la anatomía en vez de solo leerla. Ruta relativa a BASE_DIR.
+# modelo vea la anatomía en vez de solo leerla. Ruta relativa a DATA_DIR.
 DEFAULT_SPECIES_REF = "referencias/especie_rata.jpg"
 
 # Estilo SOLO para preparar la imagen que se convierte a 3D. Debe tener poca
@@ -216,7 +215,7 @@ class StyleProfile:
             return None
         path = Path(self.species_ref)
         if not path.is_absolute():
-            path = BASE_DIR / path
+            path = DATA_DIR / path
         return str(path) if path.exists() else None
 
     def to_dict(self) -> dict:
