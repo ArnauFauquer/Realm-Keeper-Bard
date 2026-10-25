@@ -71,3 +71,7 @@ así que solo funciona arrancando la app en Windows sin Docker. Se instala con:
 ```bash
 powershell -ExecutionPolicy Bypass -File models_3d/setup_3d.ps1
 ```
+
+## Licencia
+
+[MIT-0](LICENSE). Los pesos de los modelos tienen sus propias licencias (FLUX 3 Klein: FLUX Kommunity License).
