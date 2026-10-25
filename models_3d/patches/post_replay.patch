@@ -1,0 +1,50 @@
+diff --git a/src/post_replay.cpp b/src/post_replay.cpp
+index eeabc4e..9256843 100644
+--- a/src/post_replay.cpp
++++ b/src/post_replay.cpp
+@@ -60,15 +60,22 @@ int main(int argc, char** argv) {
+     FILE* f = fopen(dump, "rb");
+     if (!f) { fprintf(stderr, "cannot open %s\n", dump); return 1; }
+     int V, F, Mv, res;
+-    if (fread(&V,4,1,f)+fread(&F,4,1,f)+fread(&Mv,4,1,f)+fread(&res,4,1,f) != 4) return 1;
++    // lecturas en orden explícito: en `fread(&V)+fread(&F)+...` el orden de
++    // evaluación no está definido y MSVC lo hace de derecha a izquierda
++    size_t nh = fread(&V,4,1,f);
++    nh += fread(&F,4,1,f);
++    nh += fread(&Mv,4,1,f);
++    nh += fread(&res,4,1,f);
++    if (nh != 4) { fprintf(stderr, "short read: header\n"); return 1; }
+     std::vector<float> verts((size_t)V*3);
+     std::vector<int32_t> faces((size_t)F*3);
+     std::vector<std::array<int,3>> coords((size_t)Mv);
+     std::vector<float> pbr6((size_t)Mv*6);
+-    if (fread(verts.data(),4,verts.size(),f) != verts.size()) return 1;
+-    if (fread(faces.data(),4,faces.size(),f) != faces.size()) return 1;
+-    for (auto& c : coords) if (fread(c.data(),4,3,f) != 3) return 1;
+-    if (fread(pbr6.data(),4,pbr6.size(),f) != pbr6.size()) return 1;
++    if (fread(verts.data(),4,verts.size(),f) != verts.size()) { fprintf(stderr, "short read: verts\n"); return 1; }
++    if (fread(faces.data(),4,faces.size(),f) != faces.size()) { fprintf(stderr, "short read: faces\n"); return 1; }
++    for (auto& c : coords) if (fread(c.data(),4,3,f) != 3) { fprintf(stderr, "short read: coords\n"); return 1; }
++    // sin textura (--no-texture) el volcado no trae volumen PBR
++    if (!pbr6.empty() && fread(pbr6.data(),4,pbr6.size(),f) != pbr6.size()) { fprintf(stderr, "short read: pbr\n"); return 1; }
+     fclose(f);
+     printf("loaded: V=%d F=%d voxels=%d res=%d\n", V, F, Mv, res);
+ 
+@@ -117,7 +124,16 @@ int main(int argc, char** argv) {
+         audit("drop2", df);
+     }
+     printf("  [decimate %.1fs]\n", now()-t); t = now();
+-    if (!do_bake) { printf("(--no-bake) done\n"); return 0; }
++    if (!do_bake) {
++        // RealmKeeper: sin textura, se escribe la malla ya remallada y reducida
++        // (PLY binario en el espacio TRELLIS, sin cambio de ejes)
++        if (!trellis::write_ply(out, dv.data(), (int64_t)dv.size()/3, df.data(), (int64_t)df.size()/3)) {
++            fprintf(stderr, "cannot write %s\n", out);
++            return 1;
++        }
++        printf("(--no-bake) wrote %s (F=%zu)\n", out, df.size()/3);
++        return 0;
++    }
+ 
+     VoxelPbr vox{&coords, &pbr6, res, do_snap ? &bvh : nullptr};
+     const std::vector<float> no_vp;

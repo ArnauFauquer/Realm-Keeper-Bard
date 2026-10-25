@@ -1,0 +1,16 @@
+# Dependencias del entorno 3D (models_3d/venv, Python 3.12). La inferencia de
+# Pixal3D/TRELLIS.2 la hace trellis.cpp (ver setup_3d.ps1); aquí solo hay
+# post-proceso de mallas, render de vistas previas y MoGe-2 (FOV de la cámara).
+trimesh
+pymeshlab
+numpy
+scipy
+pillow
+networkx
+rtree
+moderngl
+scikit-image
+fast-simplification
+manifold3d
+# MoGe-2: PyTorch en CPU basta (~35 s por imagen); se instala aparte desde el
+# índice CPU de PyTorch y el repo de Microsoft (ver setup_3d.ps1)

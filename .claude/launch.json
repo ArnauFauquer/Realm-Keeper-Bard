@@ -1,0 +1,33 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "realmkeeper-web",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "app.server:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8765"
+      ],
+      "port": 8765
+    },
+    {
+      "name": "realmkeeper-web-alt",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "app.server:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8766"
+      ],
+      "port": 8766
+    }
+  ]
+}

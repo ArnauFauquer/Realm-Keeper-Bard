@@ -1,0 +1,129 @@
+@import "tailwindcss";
+
+/* Tokens: neutros fríos + un único acento brasa. Radios: controles 10px,
+   paneles 16px, chips/pastillas full. Se usan en toda la app sin excepciones. */
+:root {
+  color-scheme: light;
+  --bg: #eeeef0;
+  --surface: #f9f9fa;
+  --surface-2: #e6e6e9;
+  --line: #d6d6db;
+  --fg: #1a1a1e;
+  --muted: #5d5d66;
+  --accent: #b9501c;
+  --accent-soft: #b9501c1f;
+  --on-accent: #fff8f3;
+  --danger: #b4232f;
+  --ok: #24764a;
+  --check-a: #e4e4e8;
+  --check-b: #f4f4f6;
+  --shadow: 0 1px 0 #ffffff inset, 0 10px 30px -12px #1a1a2e33;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #101012;
+    --surface: #18181b;
+    --surface-2: #222226;
+    --line: #2d2d33;
+    --fg: #ececef;
+    --muted: #9b9ba5;
+    --accent: #ec7a40;
+    --accent-soft: #ec7a4024;
+    --on-accent: #1a0f08;
+    --danger: #f06470;
+    --ok: #4cc488;
+    --check-a: #1c1c20;
+    --check-b: #242429;
+    --shadow: 0 1px 0 #ffffff0a inset, 0 18px 40px -18px #00000099;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #101012;
+  --surface: #18181b;
+  --surface-2: #222226;
+  --line: #2d2d33;
+  --fg: #ececef;
+  --muted: #9b9ba5;
+  --accent: #ec7a40;
+  --accent-soft: #ec7a4024;
+  --on-accent: #1a0f08;
+  --danger: #f06470;
+  --ok: #4cc488;
+  --check-a: #1c1c20;
+  --check-b: #242429;
+  --shadow: 0 1px 0 #ffffff0a inset, 0 18px 40px -18px #00000099;
+}
+
+@theme inline {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --shadow-panel: var(--shadow);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+/* Damero para ver la transparencia de los PNG sin fondo. */
+.checker {
+  background-color: var(--check-b);
+  background-image: conic-gradient(var(--check-a) 25%, transparent 0 50%, var(--check-a) 0 75%, transparent 0);
+  background-size: 20px 20px;
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+textarea {
+  field-sizing: content;
+}
+
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--fg) 7%, transparent), transparent);
+    animation: shimmer 1.8s ease-in-out infinite;
+  }
+}
+
+model-viewer {
+  --poster-color: transparent;
+  --progress-bar-color: var(--accent);
+}
