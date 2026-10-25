@@ -5,8 +5,9 @@ fastapi>=0.115
 uvicorn>=0.30
 python-multipart>=0.0.9
 # Motor de imagen local (Krea 2 + FLUX 3 Klein). PyTorch con CUDA se instala
-# aparte: pip install torch --index-url https://download.pytorch.org/whl/cu128
+# aparte: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 torch>=2.8
+torchvision>=0.23
 diffusers>=0.42
 transformers>=5.0
 accelerate>=1.10

@@ -4,7 +4,7 @@ import { api } from '../api'
 import { useApp } from '../appContext'
 import { ImageSource } from '../components/ImageSource'
 import { Stage } from '../components/Stage'
-import { NumberInput, Segmented, Select, TextArea } from '../components/ui'
+import { NumberInput, Select, TextArea } from '../components/ui'
 import { useElapsed, useJob } from '../useJob'
 import { RunBar, useResults, Workbench } from './Workbench'
 
@@ -12,13 +12,10 @@ export function MeshPage() {
   const { inbox, lastGenerated, lastTransparent, options, noteResult } = useApp()
   const results = useResults()
   const [source, setSource] = useState<string | null>(null)
-  const [model, setModel] = useState('pixal3d')
-  const [quality, setQuality] = useState('maxima')
   const [prepare, setPrepare] = useState('detailed')
   const [expression, setExpression] = useState('')
   const [height, setHeight] = useState(100)
   const [faces, setFaces] = useState(1000)
-  const [seed, setSeed] = useState(42)
   const [variants, setVariants] = useState(1)
   const job = useJob((item) => {
     results.add(item)
@@ -31,7 +28,7 @@ export function MeshPage() {
     if (incoming) setSource(incoming.path)
   }, [incoming])
 
-  const numbersOk = [height, faces, seed, variants].every(Number.isFinite)
+  const numbersOk = [height, faces, variants].every(Number.isFinite)
   const ready = options?.mesh_ready ?? true
 
   return (
@@ -51,20 +48,6 @@ export function MeshPage() {
             last={lastTransparent ?? lastGenerated}
             folders={['transparent', 'images', 'references']}
           />
-          <div className="grid grid-cols-2 gap-3">
-            <Segmented
-              label="Modelo"
-              value={model}
-              onChange={setModel}
-              options={(options?.mesh_models ?? []).map((o) => ({ value: o.value, label: o.label }))}
-            />
-            <Segmented
-              label="Calidad"
-              value={quality}
-              onChange={setQuality}
-              options={(options?.mesh_qualities ?? []).map((o) => ({ value: o.value, label: o.label }))}
-            />
-          </div>
           <Select
             label="Preparar con FLUX 3"
             value={prepare}
@@ -83,11 +66,10 @@ export function MeshPage() {
           <div className="grid grid-cols-2 gap-3">
             <NumberInput label="Alto (mm)" value={height} onChange={setHeight} min={10} max={999} step={5} />
             <NumberInput label="Caras (miles)" value={faces} onChange={setFaces} min={50} max={3000} step={50} />
-            <NumberInput label="Semilla" value={seed} onChange={setSeed} min={0} max={2 ** 31 - 1} />
             <NumberInput label="Variantes" value={variants} onChange={setVariants} min={1} max={6} />
           </div>
           <p className="-mt-2 text-xs leading-relaxed text-muted">
-            Cada variante usa la semilla siguiente: son interpretaciones distintas de lo que no se ve en la imagen.
+            Cada variante usa una semilla aleatoria: son interpretaciones distintas de lo que no se ve en la imagen.
           </p>
           <RunBar
             label="Generar modelo 3D"
@@ -100,13 +82,10 @@ export function MeshPage() {
               job.start(() =>
                 api.mesh({
                   source,
-                  model,
-                  quality,
                   prepare,
                   expression,
                   height_mm: height,
                   faces_k: Math.round(faces),
-                  seed: Math.round(seed),
                   variants: Math.min(6, Math.max(1, Math.round(variants))),
                 }),
               )

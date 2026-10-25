@@ -103,7 +103,9 @@ class LocalEngine:
     def _load_flux3():
         import torch
         from diffusers import ComponentsManager, Flux3Transformer2DModel, GGUFQuantizationConfig, ModularPipeline
+        import gguf
         from diffusers.hooks import apply_group_offloading
+        from diffusers.quantizers.gguf.utils import dequantize_gguf_tensor
 
         transformer = Flux3Transformer2DModel.from_single_file(
             str(FLUX3_GGUF), config=FLUX3_REPO, subfolder="transformer",
@@ -114,14 +116,27 @@ class LocalEngine:
         if OFFLOAD == "model":
             manager = ComponentsManager()
             manager.enable_auto_cpu_offload(device="cuda")
-        pipe = ModularPipeline.from_pretrained(FLUX3_REPO, components_manager=manager)
-        pipe.load_components(names=[n for n in pipe.pretrained_component_names if n != "transformer"],
-                            dtype=torch.bfloat16)
+        # Sin el "prompt upsampler" (Qwen3.5 9B que reescribe el prompt): el de la
+        # app ya es detallado, y no cabe junto al resto. `.blocks` es una copia.
+        blocks = ModularPipeline.from_pretrained(FLUX3_REPO).blocks
+        blocks.sub_blocks.pop("prompt_upsampler")
+        pipe = blocks.init_pipeline(FLUX3_REPO, components_manager=manager)
+        pipe.load_components(names=["text_encoder", "tokenizer", "vae"], dtype=torch.bfloat16)
         pipe.update_components(transformer=transformer)
+        # Las pocas capas BF16 del GGUF (embeddings de tiempo) llegan al cálculo sin
+        # decuantizar y fallan: se pasan a bf16 normal (son pequeñas).
+        for module in pipe.transformer.modules():
+            for name, param in list(module.named_parameters(recurse=False)):
+                if getattr(param, "quant_type", None) == gguf.GGMLQuantizationType.BF16:
+                    module._parameters[name] = torch.nn.Parameter(
+                        dequantize_gguf_tensor(param).to(torch.bfloat16), requires_grad=False)
         if OFFLOAD != "model":
-            for module in (pipe.text_encoder, pipe.transformer, pipe.vae):
-                apply_group_offloading(module, onload_device=torch.device("cuda"),
-                                       offload_type="leaf_level", use_stream=True)
+            # El Q8 (6 GB) cabe entero; el offload por capas además le quita el tipo
+            # GGUF a los pesos. Solo el encoder (8,8 GB) va por capas.
+            pipe.transformer.to("cuda")
+            pipe.vae.to("cuda")
+            apply_group_offloading(pipe.text_encoder, onload_device=torch.device("cuda"),
+                                   offload_type="leaf_level", use_stream=True)
         return pipe
 
     @staticmethod
@@ -138,8 +153,12 @@ class LocalEngine:
         w, h = SIZES.get(aspect_ratio, SIZES["1:1"])
         with self.lock:
             pipe = self._use("krea")
+            # Krea corta el texto en max_sequence_length (512 por defecto) y un
+            # personaje con anatomía pasa de 900 tokens: sin esto se pierde el estilo.
+            tokens = len(pipe.tokenizer(prompt)["input_ids"])
             image = pipe(
                 prompt, width=w, height=h, num_inference_steps=8, guidance_scale=0.0,
+                max_sequence_length=max(512, -(-(tokens + 32) // 64) * 64),
                 generator=torch.Generator("cpu").manual_seed(random.randint(0, 2**32 - 1)),
             ).images[0]
         return self._png(image)

@@ -1,4 +1,4 @@
-"""Workflow imagen → malla 3D imprimible (STL) con Pixal3D o TRELLIS.2.
+"""Workflow imagen → malla 3D imprimible (STL) con Pixal3D.
 
 La inferencia la hace trellis.cpp (C++/CUDA) y el post-proceso de la malla un
 worker en el entorno aparte `models_3d/venv` (trimesh + pymeshlab). Aquí solo
@@ -8,6 +8,7 @@ se lanza `models_3d/workers/run3d.py` como subproceso y se interpreta su salida.
 import json
 import os
 import re
+import secrets
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,12 +17,6 @@ from typing import Callable
 from .config import MODELS_3D_OUTPUT_DIR, MODELS_3D_PYTHON, MODELS_3D_WORKER
 
 
-# (etiqueta en la interfaz, valor para el worker). Los parámetros concretos de cada
-# nivel están en QUALITY de models_3d/workers/run3d.py.
-MESH_QUALITIES = (("Normal", "normal"), ("Máxima", "maxima"))
-# (etiqueta, valor): Pixal3D es un fine-tune de TRELLIS.2 alineado a píxel; en
-# las pruebas fue más fiel a la imagen y más robusto en las zonas no visibles.
-MESH_MODELS = (("Pixal3D", "pixal3d"), ("TRELLIS.2", "trellis"))
 # Preparación de la imagen con FLUX 3 (motor local) antes de la malla:
 # "detailed" = escultura gris de alto detalle (style_3d del perfil), "clay" =
 # arcilla lisa (PREPARE_3D_PROMPT), "none" = se usa la imagen tal cual.
@@ -34,15 +29,19 @@ MESH_PREPARE_MODES = (
 
 @dataclass
 class Mesh3DOptions:
-    model: str = "pixal3d"
-    seed: int = 42
+    seed: int = 0
     max_faces: int = 1000000
     height_mm: float = 100.0
-    quality: str = "maxima"
 
 
 def environment_ready() -> bool:
     return MODELS_3D_PYTHON.exists() and MODELS_3D_WORKER.exists()
+
+
+def random_seed() -> int:
+    """Cada malla usa una semilla nueva: las variantes son interpretaciones
+    distintas de lo que no se ve en la imagen."""
+    return secrets.randbelow(2**31)
 
 
 def start_mesh_generation(image_path: str, options: Mesh3DOptions) -> subprocess.Popen:
@@ -56,8 +55,6 @@ def start_mesh_generation(image_path: str, options: Mesh3DOptions) -> subprocess
         "--seed", str(options.seed),
         "--faces", str(options.max_faces),
         "--height-mm", str(options.height_mm),
-        "--quality", options.quality,
-        "--model", options.model,
     ]
     return subprocess.Popen(
         cmd,

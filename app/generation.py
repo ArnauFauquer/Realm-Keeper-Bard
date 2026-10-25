@@ -4,6 +4,8 @@ Crear usa Krea 2 (solo texto); transformar y preparar para 3D usan FLUX 3 Image
 Klein con las imágenes como referencia. Los prompts van en inglés.
 """
 
+import re
+
 from .local_engine import LocalEngine
 from .style_profile import DEFAULT_EXPRESSION_3D, StyleProfile
 
@@ -38,6 +40,41 @@ def _species_applies(profile: StyleProfile, category: str, use_species: bool) ->
     return use_species and category == "personaje" and bool(profile.species_prompt.strip())
 
 
+# Nombres entre comillas de la descripción de un mapa ("…", «…», “…” o '…').
+QUOTED_NAME = re.compile(r""""([^"]+)"|«([^»]+)»|“([^”]+)”|(?<!\w)'([^']+)'(?!\w)""")
+REGION_WORDS = ("comarca", "región", "region", "reino", "tierra", "país", "pais", "isla", "provincia")
+
+
+def map_labels(description: str) -> str:
+    """Lista cerrada de rótulos para un mapa. Krea repite lugares y se inventa
+    el título si solo se le prohíbe ("no repitas"): funciona mejor decirle en
+    positivo cuántos rótulos hay y cuáles. El primer nombre es el título si
+    antes aparece una palabra de región ("La comarca de \"Valle Bellota\"")."""
+    names, seen = [], set()
+    first_start = None
+    for match in QUOTED_NAME.finditer(description):
+        name = next(g for g in match.groups() if g).strip()
+        if first_start is None:
+            first_start = match.start()
+        if name.lower() not in seen:
+            seen.add(name.lower())
+            names.append(name)
+    if not names:
+        return ""
+    title = None
+    # solo si la palabra va justo delante ("La comarca de ..."), no en "a region with the village ..."
+    if any(w in REGION_WORDS for w in description[:first_start].lower().split()[-3:]):
+        title, names = names[0], names[1:]
+    title_line = (f"The cartouche shows only the title '{title}'." if title
+                  else "The cartouche is a decorative frame with no text inside.")
+    if not names:
+        return f" Labels: {title_line}"
+    quoted = ", ".join(f"'{n}'" for n in names)
+    return (f" Labels: {title_line} The map has exactly {len(names)} place "
+            f"{'label' if len(names) == 1 else 'labels'}, one next to each place, each name written a single "
+            f"time on the whole map: {quoted}. Each of these places is drawn as one single vignette.")
+
+
 def build_create_prompt(
     profile: StyleProfile, category: str, description: str, species_ref: bool = False,
     use_species: bool = False,
@@ -66,6 +103,7 @@ def build_create_prompt(
         f"Visual style (use exactly this style, it is the same in every "
         f"image of this world): {profile.style_for(category)}\n\n"
         f"Constraints: {profile.constraints_for(category)}"
+        f"{map_labels(description) if category == 'mapa' else ''}"
     )
 
 

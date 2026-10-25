@@ -7,7 +7,7 @@ imágenes en modelos 3D imprimibles (STL).
 - **Crear**: Krea 2 Turbo (texto → imagen).
 - **Transformar / editar**: FLUX 3 Image Klein (con imágenes de referencia).
 - **Quitar fondo**: rembg.
-- **3D**: Pixal3D / TRELLIS.2 vía trellis.cpp (solo Windows, fuera de Docker).
+- **3D**: Pixal3D vía trellis.cpp (solo Windows, fuera de Docker).
 
 Los modelos de imagen corren dentro de la app con
 [diffusers](https://github.com/huggingface/diffusers), sin servicios externos.
@@ -55,7 +55,7 @@ como único volumen en `/data` (se puede cambiar con `DATA_DIR`).
 ## Arrancar sin Docker
 
 ```bash
-pip install torch --index-url https://download.pytorch.org/whl/cu128
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 pip install -r requirements.txt
 cd web && npm ci && npm run build && cd ..
 python main.py

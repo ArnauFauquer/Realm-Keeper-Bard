@@ -7,8 +7,8 @@ por otra aparte, para que no espere detrás de un modelo 3D. Las imágenes se re
 ("generated_images/x.png") y solo se sirven/abren las de ALLOWED_ROOTS.
 """
 
+import glob
 import os
-import queue
 import shutil
 import subprocess
 import threading
@@ -36,11 +36,10 @@ from .generation import (
 from .image_utils import save_image_bytes
 from .local_engine import LocalEngine
 from .mesh_generation import (
-    MESH_MODELS,
     MESH_PREPARE_MODES,
-    MESH_QUALITIES,
     Mesh3DOptions,
     environment_ready,
+    random_seed,
     run_mesh_generation,
     start_mesh_generation,
 )
@@ -94,9 +93,10 @@ def image_item(path: str | Path) -> dict:
 def mesh_item(result: dict) -> dict:
     return {
         "kind": "mesh",
-        **{k: v for k, v in result.items() if k not in ("stl", "glb", "previews")},
+        **{k: v for k, v in result.items() if k not in ("stl", "glb", "glb_color", "previews")},
         "stl": to_rel(result["stl"]),
         "glb": to_rel(result["glb"]),
+        "glb_color": to_rel(result["glb_color"]) if result.get("glb_color") else None,
         "previews": [to_rel(p) for p in result.get("previews", [])],
         "name": Path(result["stl"]).stem,
     }
@@ -132,12 +132,13 @@ class EngineState:
 
 
 class Job:
-    def __init__(self, kind: str, label: str, lane: str, fn):
+    def __init__(self, kind: str, label: str, lane: str, fn, model: str | None = None):
         self.id = uuid.uuid4().hex[:12]
         self.kind = kind
         self.label = label
         self.lane = lane
         self.fn = fn
+        self.model = model  # modelo de imagen que necesita ("krea" | "flux3"), o None
         self.status = "queued"  # queued | running | done | error | cancelled
         self.progress = ""
         self.results: list[dict] = []
@@ -150,10 +151,7 @@ class Job:
         self.cancelled = False
 
     def to_dict(self) -> dict:
-        position = 0
-        if self.status == "queued":
-            position = 1 + sum(1 for j in list(jobs.values())
-                               if j.lane == self.lane and j.status == "queued" and j.created < self.created)
+        position = lanes[self.lane].position(self) if self.status == "queued" else 0
         return {"id": self.id, "kind": self.kind, "label": self.label, "status": self.status,
                 "progress": self.progress, "results": self.results, "error": self.error,
                 "warning": self.warning, "created": self.created, "started": self.started,
@@ -165,40 +163,88 @@ style_library: StyleLibrary = load_style_library()
 jobs: dict[str, Job] = {}
 last = {"generated": None, "transparent": None}
 
-# "gpu": los modelos de imagen y TRELLIS no caben a la vez en la VRAM. "light": quitar fondo.
-LANES = ("gpu", "light")
-lane_queues: dict[str, queue.Queue] = {lane: queue.Queue() for lane in LANES}
 KEEP_FINISHED = 80
+# Agrupar por modelo: cargar Krea o FLUX 3 cuesta ~30-60 s, así que primero van
+# los trabajos que usan el modelo ya cargado. Para que nadie espere sin fin, el
+# más antiguo pasa delante si lleva más de MAX_WAIT o tras MAX_STREAK saltos.
+MAX_WAIT = 600
+MAX_STREAK = 6
 
 
-def lane_worker(lane: str):
-    while True:
-        job: Job = lane_queues[lane].get()
-        if job.cancelled:
-            continue
-        job.status, job.started = "running", time.time()
-        try:
-            job.fn(job)
-            job.status = "cancelled" if job.cancelled else "done"
-        except Exception as exc:  # noqa: BLE001
-            job.status = "cancelled" if job.cancelled else "error"
-            job.error = str(exc)[-1500:]
-        finally:
-            job.proc = None
-            job.finished = time.time()
+class Lane:
+    """Cola de una fila de trabajo con un único worker."""
+
+    def __init__(self, name: str, model_aware: bool):
+        self.name = name
+        self.model_aware = model_aware
+        self.pending: list[Job] = []
+        self.cond = threading.Condition()
+        self.streak = 0  # trabajos seguidos que se han colado delante del más antiguo
+        self.model: str | None = None  # modelo del último trabajo que lo usaba (cargado o cargándose)
+        threading.Thread(target=self._worker, daemon=True).start()
+
+    def put(self, job: Job):
+        with self.cond:
+            self.pending.append(job)
+            self.cond.notify()
+
+    def drop(self, job: Job):
+        with self.cond:
+            if job in self.pending:
+                self.pending.remove(job)
+
+    def _order(self) -> list[Job]:
+        """Orden en que saldrán los pendientes (sin contar el límite de espera)."""
+        if not self.model_aware or not self.pending:
+            return list(self.pending)
+        oldest = self.pending[0]
+        if self.streak >= MAX_STREAK or time.time() - oldest.created > MAX_WAIT:
+            return [oldest, *self.pending[1:]]
+        loaded = self.model or engine_state.engine.loaded
+        # estable: dentro de cada grupo se respeta el orden de llegada
+        return sorted(self.pending, key=lambda j: j.model not in (None, loaded))
+
+    def position(self, job: Job) -> int:
+        with self.cond:
+            order = self._order()
+            return order.index(job) + 1 if job in order else 0
+
+    def _next(self) -> Job:
+        with self.cond:
+            while not self.pending:
+                self.cond.wait()
+            job = self._order()[0]
+            self.streak = 0 if job is self.pending[0] else self.streak + 1
+            self.pending.remove(job)
+            self.model = job.model or self.model
+            return job
+
+    def _worker(self):
+        while True:
+            job = self._next()
+            job.status, job.started = "running", time.time()
+            try:
+                job.fn(job)
+                job.status = "cancelled" if job.cancelled else "done"
+            except Exception as exc:  # noqa: BLE001
+                job.status = "cancelled" if job.cancelled else "error"
+                job.error = str(exc)[-1500:]
+            finally:
+                job.proc = None
+                job.finished = time.time()
 
 
-for _lane in LANES:
-    threading.Thread(target=lane_worker, args=(_lane,), daemon=True).start()
+# "gpu": los modelos de imagen y el 3D no caben a la vez en la VRAM. "light": quitar fondo.
+lanes = {"gpu": Lane("gpu", model_aware=True), "light": Lane("light", model_aware=False)}
 
 
-def run_job(kind: str, label: str, fn, lane: str = "gpu") -> dict:
-    job = Job(kind, label, lane, fn)
+def run_job(kind: str, label: str, fn, lane: str = "gpu", model: str | None = None) -> dict:
+    job = Job(kind, label, lane, fn, model)
     jobs[job.id] = job
     finished = [j for j in jobs.values() if j.finished]
     for old in finished[:max(0, len(finished) - KEEP_FINISHED)]:
         del jobs[old.id]
-    lane_queues[lane].put(job)
+    lanes[lane].put(job)
     return job.to_dict()
 
 
@@ -251,8 +297,6 @@ def post_engine_start():
 def get_options():
     return {
         "categories": list(CATEGORIES),
-        "mesh_models": [{"label": l, "value": v} for l, v in MESH_MODELS],
-        "mesh_qualities": [{"label": l, "value": v} for l, v in MESH_QUALITIES],
         "mesh_prepare_modes": [{"label": l, "value": v} for l, v in MESH_PREPARE_MODES],
         "mesh_ready": environment_ready(),
     }
@@ -293,7 +337,7 @@ def post_create(body: CreateBody):
                                      bool(body.species_id))
         finish_image(job, data, mime, body.category, body.remove_bg)
 
-    return run_job("create", f"{body.category}: {short(body.description)}", fn)
+    return run_job("create", f"{body.category}: {short(body.description)}", fn, model="krea")
 
 
 class TransformBody(BaseModel):
@@ -316,7 +360,7 @@ def post_transform(body: TransformBody):
                                         bool(body.species_id))
         finish_image(job, data, mime, "mapa_estilizado" if body.is_map else "estilizado", body.remove_bg)
 
-    return run_job("transform", Path(ref).name, fn)
+    return run_job("transform", Path(ref).name, fn, model="flux3")
 
 
 class SourceBody(BaseModel):
@@ -338,13 +382,10 @@ def post_remove_bg(body: SourceBody):
 
 class MeshBody(BaseModel):
     source: str
-    model: str = "pixal3d"
-    quality: str = "maxima"
     prepare: str = "detailed"
     expression: str = ""
     height_mm: float = Field(100, ge=10, le=999)
     faces_k: int = Field(1000, ge=50, le=3000)
-    seed: int = Field(42, ge=0, le=2**31 - 1)
     variants: int = Field(1, ge=1, le=6)
 
 
@@ -354,8 +395,8 @@ def post_mesh(body: MeshBody):
         raise HTTPException(400, "Falta el entorno 3D: ejecuta models_3d\\setup_3d.ps1.")
     source = resolve_image(body.source)
     profile = style_library.resolve()  # el estilo 3D es común a todas las plantillas
-    options = Mesh3DOptions(model=body.model, seed=body.seed, max_faces=body.faces_k * 1000,
-                            height_mm=body.height_mm, quality=body.quality)
+    options = Mesh3DOptions(max_faces=body.faces_k * 1000,
+                            height_mm=body.height_mm)
 
     def fn(job: Job):
         image = source
@@ -373,7 +414,7 @@ def post_mesh(body: MeshBody):
         for i in range(body.variants):
             if job.cancelled:
                 break
-            options.seed = body.seed + i
+            options.seed = random_seed()
             prefix = f"[{i + 1}/{body.variants}] " if body.variants > 1 else ""
             job.proc = start_mesh_generation(image, options)
 
@@ -383,7 +424,8 @@ def post_mesh(body: MeshBody):
             job.results.append(mesh_item(run_mesh_generation(job.proc, on_progress)))
 
     variants = f" ×{body.variants}" if body.variants > 1 else ""
-    return run_job("mesh", f"{Path(source).name}{variants}", fn)
+    return run_job("mesh", f"{Path(source).name}{variants}", fn,
+                   model=None if body.prepare == "none" else "flux3")
 
 
 @app.get("/api/jobs")
@@ -408,14 +450,17 @@ def cancel_job(job_id: str):
         return job.to_dict()
     job.cancelled = True
     if job.status == "queued":
-        # el worker lo saltará al sacarlo de la cola
+        lanes[job.lane].drop(job)
         job.status, job.finished = "cancelled", time.time()
         return job.to_dict()
     proc = job.proc
     if proc and proc.poll() is None:
-        # el worker de TRELLIS lanza a su vez trellis-cli: se mata el árbol entero
-        subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True,
-                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        if os.name == "nt":
+            # el worker 3D lanza a su vez trellis-cli: se mata el árbol entero
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        else:
+            proc.kill()
     job.progress = "Cancelando..."
     return job.to_dict()
 
@@ -435,14 +480,17 @@ async def post_upload(file: UploadFile = File(...)):
 @app.get("/api/library")
 def get_library(folder: str = "images", offset: int = 0, limit: int = 60):
     if folder == "models":
-        files = sorted(MODELS_3D_OUTPUT_DIR.glob("*.glb"), key=lambda p: p.stat().st_mtime, reverse=True)
+        files = sorted((p for p in MODELS_3D_OUTPUT_DIR.glob("*.glb") if not p.stem.endswith("_color")),
+                       key=lambda p: p.stat().st_mtime, reverse=True)
         items = []
         for glb in files[offset:offset + limit]:
             stl = glb.with_suffix(".stl")
+            color = glb.with_name(f"{glb.stem}_color.glb")
             preview = MODELS_3D_OUTPUT_DIR / "previews" / f"{glb.stem}_00.png"
             items.append({
                 "kind": "mesh", "name": glb.stem, "glb": to_rel(glb),
                 "stl": to_rel(stl) if stl.exists() else None,
+                "glb_color": to_rel(color) if color.exists() else None,
                 "previews": [to_rel(preview)] if preview.exists() else [],
                 "mtime": glb.stat().st_mtime,
             })
@@ -468,6 +516,34 @@ def post_open(body: OpenBody):
     if not path.exists():
         raise HTTPException(404, "No existe.")
     os.startfile(path)
+    return {"ok": True}
+
+
+@app.post("/api/delete")
+def post_delete(body: OpenBody):
+    """Borra una imagen o un modelo 3D (su .glb con el .stl, el _color.glb y las
+    vistas previas) de la biblioteca, junto con sus miniaturas en caché."""
+    path = resolve_rel(body.path)
+    if not path.is_file():
+        raise HTTPException(404, "No existe.")
+    rel = to_rel(path)
+    used_by = [sp["name"] for sp in style_library.to_dict()["species"] if sp.get("species_ref") == rel]
+    if used_by:
+        raise HTTPException(409, f"Es la referencia de la especie {', '.join(used_by)}; cámbiala antes de borrarla.")
+    if path.suffix.lower() == ".glb":
+        targets = [path, path.with_suffix(".stl"), path.with_name(f"{path.stem}_color.glb"),
+                   *(MODELS_3D_OUTPUT_DIR / "previews").glob(f"{path.stem}_*.png"),
+                   THUMB_DIR / f"{path.stem}_normals.glb"]
+    else:
+        targets = [path]
+    for target in targets:
+        if target.is_file():
+            thumbs = THUMB_DIR.glob(f"{glob.escape(to_rel(target).replace('/', '__'))}_*.webp")
+            for thumb in [target, *thumbs]:
+                thumb.unlink(missing_ok=True)
+    for key, value in last.items():
+        if value and Path(value).resolve() == path:
+            last[key] = None
     return {"ok": True}
 
 

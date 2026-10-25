@@ -5,7 +5,7 @@
   - trellis\src\           trellis.cpp compilado desde main con CUDA (Pixal3D y
                            --steps no están en la release v0.6.0)
   - trellis\runtime_main\  trellis-cli.exe + DLLs de ggml y CUDA
-  - trellis\models\        pesos GGUF de TRELLIS.2 (Q8) y Pixal3D
+  - trellis\models\        pesos GGUF de Pixal3D + los decoders compartidos con TRELLIS.2 (Q8)
 
   Requisitos que instala con winget si faltan: CUDA Toolkit 13.2 y Visual
   Studio 2022 Build Tools (C++). Ambos piden permisos de administrador.
@@ -16,7 +16,7 @@ $ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
 Set-Location $Root
 
-$TrellisQuant = "q8"   # "q8" (~9.5 GB) o "q4" (~6 GB)
+$TrellisQuant = "q8"   # decoders compartidos: "q8" o "q4"
 $CudaVersion = "13.2"  # compatible con el driver instalado (nvidia-smi: CUDA 13.2)
 $CudaArch = "86"       # RTX 3080; ver https://developer.nvidia.com/cuda-gpus
 
@@ -80,12 +80,11 @@ cmake --build build --target trellis-server trellis-cli post-replay || exit /b 1
 # ---- pesos -------------------------------------------------------------------
 $ModelsDir = "trellis\models"
 New-Item -ItemType Directory -Force -Path $ModelsDir | Out-Null
-# compartidos (TRELLIS.2): decoders, DINOv3, BiRefNet + flows de TRELLIS.2
-foreach ($m in @("birefnet", "dinov3", "ss_flow", "ss_dec", "shape_flow_512", "shape_flow_1024",
-                 "shape_dec", "tex_flow_512", "tex_flow_1024", "tex_dec")) {
+# compartidos con TRELLIS.2 (Pixal3D no los cambia): decoders, DINOv3 y BiRefNet
+foreach ($m in @("birefnet", "dinov3", "ss_dec", "shape_dec", "tex_dec")) {
   $dest = Join-Path $ModelsDir "$m.gguf"
   if (-not (Test-Path $dest)) {
-    Log "Descargando pesos TRELLIS.2: $m ($TrellisQuant)"
+    Log "Descargando pesos compartidos: $m ($TrellisQuant)"
     Start-BitsTransfer -Source "https://huggingface.co/ilintar/trellis2-gguf/resolve/main/$TrellisQuant/$m.gguf" -Destination $dest
   }
 }

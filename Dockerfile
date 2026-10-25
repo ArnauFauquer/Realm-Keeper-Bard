@@ -14,7 +14,7 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # PyTorch con CUDA 12.8 (trae sus propias librerías CUDA; basta el driver del host)
-RUN pip install torch --index-url https://download.pytorch.org/whl/cu128
+RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 COPY requirements.txt ./
 RUN pip install -r requirements.txt
 

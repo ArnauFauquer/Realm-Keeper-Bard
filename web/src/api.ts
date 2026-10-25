@@ -17,10 +17,11 @@ export interface MeshItem {
   kind: 'mesh'
   name: string
   glb: string
+  /** GLB con la textura horneada (solo para verlo; el STL no lleva color). */
+  glb_color?: string | null
   stl: string | null
   previews: string[]
   model?: string
-  quality?: string
   seed?: number
   faces?: number
   size_mm?: number[]
@@ -60,8 +61,6 @@ export interface Option {
 
 export interface Options {
   categories: Category[]
-  mesh_models: Option[]
-  mesh_qualities: Option[]
   mesh_prepare_modes: Option[]
   mesh_ready: boolean
 }
@@ -143,13 +142,10 @@ export const api = {
   removeBg: (source: string) => request<Job>('/api/remove-bg', json('POST', { source })),
   mesh: (body: {
     source: string
-    model: string
-    quality: string
     prepare: string
     expression: string
     height_mm: number
     faces_k: number
-    seed: number
     variants: number
   }) => request<Job>('/api/mesh', json('POST', body)),
   jobs: () => request<Job[]>('/api/jobs'),
@@ -163,6 +159,7 @@ export const api = {
   library: (folder: LibraryFolder, offset = 0, limit = 60) =>
     request<{ items: ResultItem[]; total: number }>(`/api/library?folder=${folder}&offset=${offset}&limit=${limit}`),
   open: (path: string) => request<{ ok: boolean }>('/api/open', json('POST', { path })),
+  remove: (path: string) => request<{ ok: boolean }>('/api/delete', json('POST', { path })),
   style: () => request<StyleData>('/api/style'),
   saveStyle: (data: StyleData) => request<StyleData>('/api/style', json('PUT', data)),
 }

@@ -5,11 +5,14 @@ subproceso. Replica el flujo del Space oficial de Pixal3D (TencentARC/Pixal3D)
 sobre trellis.cpp (C++/CUDA):
 
   1. FOV de la cámara estimado con MoGe-2 (camera.py), como el Space;
-  2. trellis-cli --no-texture --dump-post: malla completa ya limpiada con la
-     cadena oficial (soldado, cierre de agujeros, remallado dual-contouring,
-     eliminación de flotantes);
-  3. post-replay: reducción QEM oficial (en GPU) al número de caras pedido
-     (el Space usa 1M por defecto);
+  2. trellis-cli --dump-post: malla completa ya limpiada con la cadena oficial
+     (soldado, cierre de agujeros, remallado dual-contouring, eliminación de
+     flotantes) + volumen PBR de la textura;
+  3. post-replay (dos pasadas sobre el mismo volcado):
+     - reducción QEM oficial (en GPU) al número de caras pedido, sin textura
+       (el Space usa 1M por defecto) -> malla para imprimir;
+     - misma reducción + desplegado UV + horneado de la textura (atlas
+       TEXTURED_ATLAS) -> GLB pintado como el del Space, solo para verlo;
   4. reparación a 2-manifold y relleno de la piel hueca que generan los modelos
      (solidify.py) + STL en milímetros (Z arriba) + GLB + vistas previas.
 
@@ -21,7 +24,7 @@ Protocolo con la GUI (stdout, una línea por mensaje):
 
 import argparse
 import json
-import math
+import struct
 import shutil
 import subprocess
 import sys
@@ -33,7 +36,7 @@ from pathlib import Path
 MODELS_DIR = Path(__file__).resolve().parent.parent
 TRELLIS_DIR = MODELS_DIR / "trellis"
 # trellis.cpp compilado desde main (septiembre 2026): trae Pixal3D, --steps y
-# --dump-post; post-replay lleva un parche para escribir la malla sin textura
+# --dump-post; post-replay lleva un parche para escribir la malla sin hornear
 RUNTIME = TRELLIS_DIR / "runtime_main"
 TRELLIS_EXE = RUNTIME / "trellis-cli.exe"
 POST_REPLAY_EXE = RUNTIME / "post-replay.exe"
@@ -42,12 +45,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mesh_utils import export_stl, make_printable, render_turntable, repair_light  # noqa: E402
 from solidify import solidify  # noqa: E402
 
-# Resolución de la cascada (el Space usa 1536 por defecto).
-QUALITY = {
-    "normal": {"res": 1024},
-    "maxima": {"res": 1536},
-}
-MODEL_FAMILIES = ("pixal3d", "trellis")
+# Resolución de la cascada: la máxima, la que usa el Space por defecto.
+CASCADE_RES = 1536
+# atlas de la textura del GLB pintado, el máximo (trellis-cli usa 2048 @1024)
+TEXTURED_ATLAS = 4096
 DEFAULT_FOV = 49.13  # valor por defecto de Pixal3D si MoGe-2 no está disponible
 
 
@@ -72,27 +73,41 @@ def run_logged(cmd: list[str], title: str):
         raise RuntimeError(f"{Path(cmd[0]).name} falló:\n" + "\n".join(tail))
 
 
-def generate_mesh(image: str, work: Path, args, res: int, fov: float) -> Path:
+def stand_up_glb(path: Path):
+    """El escritor de GLB de trellis.cpp gira (x,y,z)->(x,z,-y) para pasar de Z
+    arriba (TRELLIS.2) a Y arriba, pero Pixal3D ya sale con Y arriba y el modelo
+    queda tumbado. Se deshace con una rotación de +90° en X en el nodo raíz,
+    sin tocar la geometría ni recodificar las texturas."""
+    data = path.read_bytes()
+    json_len = struct.unpack_from("<I", data, 12)[0]
+    gltf = json.loads(data[20:20 + json_len])
+    for i in gltf["scenes"][gltf.get("scene", 0)]["nodes"]:
+        gltf["nodes"][i]["rotation"] = [0.7071068, 0.0, 0.0, 0.7071068]
+    js = json.dumps(gltf, separators=(",", ":")).encode()
+    js += b" " * (-len(js) % 4)
+    rest = data[20 + json_len:]  # chunk binario tal cual
+    path.write_bytes(struct.pack("<III", 0x46546C67, 2, 20 + len(js) + len(rest))
+                     + struct.pack("<II", len(js), 0x4E4F534A) + js + rest)
+
+
+def generate_mesh(image: str, work: Path, args, res: int, fov: float) -> tuple[Path, Path | None]:
+    """Devuelve (PLY sin textura para imprimir, GLB pintado o None si falla)."""
     for exe in (TRELLIS_EXE, POST_REPLAY_EXE):
         if not exe.exists():
             raise RuntimeError(f"No se encuentra {exe}. Ejecuta models_3d/setup_3d.ps1.")
     dump = work / "mesh.bin"
-    title = "Pixal3D" if args.model == "pixal3d" else "TRELLIS.2"
-    progress(f"{title} @res{res}" + (f", FOV {fov:.1f}°" if args.model == "pixal3d" else "") + "...")
-    cmd = [
+    progress(f"Pixal3D @res{res}, FOV {fov:.1f}°...")
+    run_logged([
         str(TRELLIS_EXE), image, str(work / "unused.glb"),
         "--models", str(TRELLIS_DIR / "models"),
-        "--model", args.model,
+        "--model", "pixal3d",
         "--res", str(res),
         "--seed", str(args.seed),
         "--steps", str(args.steps),
-        "--no-texture",
+        "--fov", f"{fov:.3f}",
         "--dump-post", str(dump),
         "--require-gpu",
-    ]
-    if args.model == "pixal3d":
-        cmd += ["--fov", f"{fov:.3f}"]
-    run_logged(cmd, title)
+    ], "Pixal3D")
     if not dump.exists():
         raise RuntimeError("trellis-cli no generó la malla.")
 
@@ -102,7 +117,20 @@ def generate_mesh(image: str, work: Path, args, res: int, fov: float) -> Path:
         str(POST_REPLAY_EXE), str(dump), str(ply),
         "--no-remesh", "--no-bake", "--faces", str(args.faces),
     ], "QEM")
-    return ply
+
+    progress("Horneando la textura...")
+    textured = work / "color.glb"
+    try:
+        run_logged([
+            str(POST_REPLAY_EXE), str(dump), str(textured),
+            "--no-remesh", "--faces", str(args.faces), "--atlas", str(TEXTURED_ATLAS),
+        ], "Textura")
+    except RuntimeError as exc:  # la malla imprimible no depende de la textura
+        progress(f"Sin textura ({exc.args[0].splitlines()[0]})")
+    if not textured.exists():
+        return ply, None
+    stand_up_glb(textured)
+    return ply, textured
 
 
 def main():
@@ -112,8 +140,7 @@ def main():
     parser.add_argument("--image", required=True)
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--name", default="modelo")
-    parser.add_argument("--model", default="pixal3d", choices=MODEL_FAMILIES)
-    parser.add_argument("--quality", default="maxima", choices=list(QUALITY))
+    parser.add_argument("--res", type=int, default=CASCADE_RES, choices=(512, 1024, 1536))
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--steps", type=int, default=12)
     # FOV horizontal de la cámara (Pixal3D). 0 = estimarlo con MoGe-2.
@@ -126,15 +153,14 @@ def main():
     parser.add_argument("--no-fill", action="store_true")
     args = parser.parse_args()
 
-    q = QUALITY[args.quality]
     image = str(Path(args.image).resolve())
     out_dir = Path(args.out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
-    stem = f"{args.name}_{args.model}_{time.strftime('%Y%m%d_%H%M%S')}"
+    stem = f"{args.name}_pixal3d_{time.strftime('%Y%m%d_%H%M%S')}"
     t0 = time.time()
 
     fov = args.fov
-    if args.model == "pixal3d" and fov <= 0:
+    if fov <= 0:
         progress("Estimando la cámara con MoGe-2...")
         try:
             from camera import estimate_fov_deg
@@ -147,14 +173,14 @@ def main():
     # el volcado de la malla completa ocupa cientos de MB: carpeta temporal
     work = Path(tempfile.mkdtemp(prefix="realmkeeper3d_"))
     try:
-        ply = generate_mesh(image, work, args, q["res"], fov)
-        mesh = trimesh.load(ply, force="mesh", process=False)
+        ply, textured = generate_mesh(image, work, args, args.res, fov)
+        mesh = trimesh.load(ply, force="mesh", process=False)  # Pixal3D ya sale con Y arriba
+        color_path = None
+        if textured:
+            color_path = out_dir / f"{stem}_color.glb"
+            shutil.move(textured, color_path)
     finally:
         shutil.rmtree(work, ignore_errors=True)
-    if args.model == "trellis":
-        # el volcado está en el espacio TRELLIS (Z arriba); Pixal3D ya sale con
-        # Y arriba. El resto del flujo usa Y arriba (convención glTF).
-        mesh.apply_transform(trimesh.transformations.rotation_matrix(-math.pi / 2, [1, 0, 0]))
 
     filled = False
     if args.watertight:
@@ -180,12 +206,12 @@ def main():
     previews = render_turntable(mesh, preview_dir, stem, pitch_deg=10)
 
     result = {
-        "model": args.model,
-        "quality": args.quality,
+        "model": "pixal3d",
         "seed": args.seed,
         "fov": round(fov, 1),
         "stl": str(stl_path),
         "glb": str(glb_path),
+        "glb_color": str(color_path) if color_path else None,
         "previews": previews,
         "filled": filled,
         "seconds": round(time.time() - t0, 1),
