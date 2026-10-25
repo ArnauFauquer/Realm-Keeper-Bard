@@ -10,9 +10,8 @@ __pycache__/
 web/node_modules/
 web/dist/
 
-# Datos de la app (volumen /data en Docker): solo se versionan las referencias canon
-data/*
-!data/referencias/
+# Datos de la app (volumen /data en Docker): no se versiona nada
+data/
 *.log
 
 # Entorno 3D (pesado, se crea con setup_3d.ps1)
