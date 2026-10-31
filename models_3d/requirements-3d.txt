@@ -1,6 +1,6 @@
-# Dependencias del entorno 3D (models_3d/venv, Python 3.12). La inferencia de
-# Pixal3D la hace trellis.cpp (ver setup_3d.ps1); aquí solo hay
-# post-proceso de mallas, render de vistas previas y MoGe-2 (FOV de la cámara).
+# Dependencies of the 3D environment (models_3d/venv, Python 3.12). Pixal3D
+# inference is done by trellis.cpp (see setup_3d.ps1); this only covers mesh
+# post-processing, preview rendering and MoGe-2 (camera FOV).
 trimesh
 pymeshlab
 numpy
@@ -12,5 +12,5 @@ moderngl
 scikit-image
 fast-simplification
 manifold3d
-# MoGe-2: PyTorch en CPU basta (~35 s por imagen); se instala aparte desde el
-# índice CPU de PyTorch y el repo de Microsoft (ver setup_3d.ps1)
+# MoGe-2: PyTorch on CPU is enough (~35 s per image); installed separately from
+# the PyTorch CPU index and Microsoft's repo (see setup_3d.ps1)

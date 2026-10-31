@@ -19,17 +19,17 @@ function Section({ title, description, children }: { title: string; description:
   )
 }
 
-// Pestañas de los ajustes comunes: los cuatro tipos de imagen + el modelo 3D.
-type Kind = Category | 'modelo_3d'
+// Tabs for the shared settings: the four image types + the 3D model.
+type Kind = Category | 'model_3d'
 const KIND_OPTIONS: { value: Kind; label: string; icon: ReactNode }[] = [
   ...CATEGORY_OPTIONS,
-  { value: 'modelo_3d', label: 'Modelo 3D', icon: <Cube size={18} /> },
+  { value: 'model_3d', label: '3D Model', icon: <Cube size={18} /> },
 ]
 
 const newId = () => `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`
 
-/** Fila de plantillas: una pastilla por plantilla (la estrella marca la de por
- *  defecto) y otra para crear una nueva. */
+/** Template row: one pill per template (the star marks the default) and
+ *  another to create a new one. */
 function PresetTabs({
   items,
   selected,
@@ -62,8 +62,8 @@ function PresetTabs({
               : 'border-line text-muted hover:border-muted/60 hover:text-fg',
           )}
         >
-          {p.id === active && <Star size={13} weight="fill" aria-label="Por defecto" />}
-          <span className="truncate">{p.name || 'Sin nombre'}</span>
+          {p.id === active && <Star size={13} weight="fill" aria-label="Default" />}
+          <span className="truncate">{p.name || 'Unnamed'}</span>
         </button>
       ))}
       <button
@@ -97,12 +97,12 @@ function PresetActions({
   if (confirming) {
     return (
       <div className="flex flex-wrap items-center gap-2 rounded-[10px] border border-danger/35 bg-danger/8 px-3 py-2">
-        <span className="text-sm text-fg">¿Borrar «{name || 'Sin nombre'}»?</span>
+        <span className="text-sm text-fg">Delete “{name || 'Unnamed'}”?</span>
         <Button variant="danger" className="h-9" onClick={onDelete}>
-          <Trash size={16} /> Borrar
+          <Trash size={16} /> Delete
         </Button>
         <Button variant="ghost" className="h-9" onClick={() => setConfirming(false)}>
-          Cancelar
+          Cancel
         </Button>
       </div>
     )
@@ -110,7 +110,7 @@ function PresetActions({
   return (
     <div className="flex flex-wrap gap-2">
       <Button variant="ghost" className="h-9" onClick={onMakeActive} disabled={isActive}>
-        <Star size={16} weight={isActive ? 'fill' : 'regular'} /> {isActive ? 'Por defecto' : 'Usar por defecto'}
+        <Star size={16} weight={isActive ? 'fill' : 'regular'} /> {isActive ? 'Default' : 'Use as default'}
       </Button>
       <Button variant="ghost" className="h-9" onClick={onDuplicate}>
         <Copy size={16} /> Duplicar
@@ -120,9 +120,9 @@ function PresetActions({
         className="h-9 hover:text-danger"
         onClick={() => setConfirming(true)}
         disabled={!canDelete}
-        title={canDelete ? undefined : 'Tiene que quedar al menos un estilo'}
+        title={canDelete ? undefined : 'At least one style must remain'}
       >
-        <Trash size={16} /> Borrar
+        <Trash size={16} /> Delete
       </Button>
     </div>
   )
@@ -134,29 +134,29 @@ function AnchorImage({ value, onChange }: { value: string | null; onChange: (pat
   const input = useRef<HTMLInputElement>(null)
   return (
     <div className="grid gap-2">
-      <span className="text-sm font-medium text-fg">Imagen ancla</span>
+      <span className="text-sm font-medium text-fg">Anchor image</span>
       <div className="flex items-start gap-4">
         <div className="checker grid h-36 w-28 shrink-0 place-items-center overflow-hidden rounded-[10px] border border-line">
           {value ? (
-            <img src={thumbUrl(value, 320)} alt="Imagen ancla de la anatomía" className="h-full w-full object-contain" />
+            <img src={thumbUrl(value, 320)} alt="Anatomy anchor image" className="h-full w-full object-contain" />
           ) : (
-            <span className="px-2 text-center text-xs text-muted">Sin imagen</span>
+            <span className="px-2 text-center text-xs text-muted">No image</span>
           )}
         </div>
         <div className="grid gap-2">
           <p className="max-w-[40ch] text-xs leading-relaxed text-muted">
-            Al transformar personajes se adjunta como cuerpo base: el modelo ve la anatomía en vez de solo leerla.
+            When transforming characters it is attached as the base body: the model sees the anatomy instead of only reading it.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => setPicking(true)}>
-              <Images size={16} /> Elegir
+              <Images size={16} /> Choose
             </Button>
             <Button onClick={() => input.current?.click()}>
-              <UploadSimple size={16} /> Subir
+              <UploadSimple size={16} /> Upload
             </Button>
             {value && (
               <Button variant="ghost" onClick={() => onChange('')}>
-                <X size={16} /> Quitar
+                <X size={16} /> Remove
               </Button>
             )}
           </div>
@@ -179,7 +179,7 @@ function AnchorImage({ value, onChange }: { value: string | null; onChange: (pat
           }
         }}
       />
-      <Modal open={picking} onClose={() => setPicking(false)} title="Imagen ancla" wide>
+      <Modal open={picking} onClose={() => setPicking(false)} title="Anchor image" wide>
         <LibraryGrid
           folders={['references', 'images', 'transparent']}
           dense
@@ -194,7 +194,7 @@ function AnchorImage({ value, onChange }: { value: string | null; onChange: (pat
   )
 }
 
-// species_ref_resolved lo calcula el servidor: no cuenta como cambio
+// species_ref_resolved is computed by the server: it does not count as a change
 const comparable = (d: StyleData) =>
   JSON.stringify({ ...d, species: d.species.map(({ species_ref_resolved: _, ...s }) => s) })
 
@@ -204,7 +204,7 @@ export function SettingsPage() {
   const [draft, setDraft] = useState<StyleData | null>(null)
   const [styleSel, setStyleSel] = useState('')
   const [speciesSel, setSpeciesSel] = useState('')
-  const [kind, setKind] = useState<Kind>('personaje')
+  const [kind, setKind] = useState<Kind>('character')
   const [status, setStatus] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
   const [saving, setSaving] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -244,7 +244,7 @@ export function SettingsPage() {
   const addStyle = (base?: StylePreset) => {
     const preset: StylePreset = base
       ? { ...base, id: newId(), name: `${base.name} (copia)` }
-      : { id: newId(), name: 'Nuevo estilo', style_prompt: '', constraints: draft.styles[0]?.constraints ?? '' }
+      : { id: newId(), name: 'New style', style_prompt: '', constraints: draft.styles[0]?.constraints ?? '' }
     update({ styles: [...draft.styles, preset] })
     setStyleSel(preset.id)
   }
@@ -260,7 +260,7 @@ export function SettingsPage() {
   const addSpecies = (base?: SpeciesPreset) => {
     const preset: SpeciesPreset = base
       ? { ...base, id: newId(), name: `${base.name} (copia)` }
-      : { id: newId(), name: 'Nueva anatomía', species_prompt: '', species_ref: '' }
+      : { id: newId(), name: 'New anatomy', species_prompt: '', species_ref: '' }
     update({ species: [...draft.species, preset], active_species: draft.active_species || preset.id })
     setSpeciesSel(preset.id)
   }
@@ -272,7 +272,7 @@ export function SettingsPage() {
     })
     setSpeciesSel(rest[0]?.id ?? '')
   }
-  // la ruta guardada puede no existir: se previsualiza la resuelta por el servidor
+  // the saved path may not exist: preview the one resolved by the server
   const savedSpecies = species && saved.species.find((s) => s.id === species.id)
   const anchorPreview = !species
     ? null
@@ -283,7 +283,7 @@ export function SettingsPage() {
   const save = async () => {
     const blank = [...draft.styles, ...draft.species].find((p) => !p.name.trim())
     if (blank) {
-      setStatus({ kind: 'error', text: 'Todas las plantillas necesitan un nombre.' })
+      setStatus({ kind: 'error', text: 'All templates need a name.' })
       return
     }
     setSaving(true)
@@ -292,7 +292,7 @@ export function SettingsPage() {
       setSaved(s)
       setDraft(s)
       setLibrary(s)
-      setStatus({ kind: 'ok', text: 'Guardado. Se aplica desde la próxima generación.' })
+      setStatus({ kind: 'ok', text: 'Saved. Applies from the next generation.' })
     } catch (e) {
       setStatus({ kind: 'error', text: (e as Error).message })
     } finally {
@@ -303,8 +303,8 @@ export function SettingsPage() {
   return (
     <div className="grid gap-5 pb-24">
       <Section
-        title="Estilos"
-        description="Plantillas de estilo general. Al crear o transformar eliges cuál usar; la estrella marca la que sale por defecto. No se usan en los mapas."
+        title="Styles"
+        description="General style templates. When creating or transforming you choose which one to use; the star marks the default. They are not used for maps."
       >
         <PresetTabs
           items={draft.styles}
@@ -312,19 +312,19 @@ export function SettingsPage() {
           active={draft.active_style}
           onSelect={setStyleSel}
           onAdd={() => addStyle()}
-          addLabel="Nuevo estilo"
+          addLabel="New style"
         />
         <div key={style.id} className="grid gap-4">
-          <TextInput label="Nombre" value={style.name} onChange={(v) => setStyleField({ name: v })} />
+          <TextInput label="Name" value={style.name} onChange={(v) => setStyleField({ name: v })} />
           <TextArea
-            label="Prompt de estilo"
+            label="Style prompt"
             minRows={8}
             value={style.style_prompt}
-            placeholder="Describe el estilo visual que se repetirá igual en cada imagen."
+            placeholder="Describe the visual style that will be repeated identically in every image."
             onChange={(e) => setStyleField({ style_prompt: e.target.value })}
           />
           <TextArea
-            label="Restricciones"
+            label="Constraints"
             minRows={2}
             value={style.constraints}
             onChange={(e) => setStyleField({ constraints: e.target.value })}
@@ -341,8 +341,8 @@ export function SettingsPage() {
       </Section>
 
       <Section
-        title="Anatomías"
-        description="Plantillas de anatomía de especie, solo para personajes. Separan lo que es de la especie de lo que es de cada individuo."
+        title="Anatomies"
+        description="Species anatomy templates, for characters only. They separate what belongs to the species from what belongs to each individual."
       >
         <PresetTabs
           items={draft.species}
@@ -350,16 +350,16 @@ export function SettingsPage() {
           active={draft.active_species}
           onSelect={setSpeciesSel}
           onAdd={() => addSpecies()}
-          addLabel="Nueva anatomía"
+          addLabel="New anatomy"
         />
         {species ? (
           <div key={species.id} className="grid gap-4">
-            <TextInput label="Nombre" value={species.name} onChange={(v) => setSpeciesField({ name: v })} />
+            <TextInput label="Name" value={species.name} onChange={(v) => setSpeciesField({ name: v })} />
             <TextArea
-              label="Descripción de la anatomía"
+              label="Anatomy description"
               minRows={7}
               value={species.species_prompt}
-              placeholder="Cabeza, cuerpo, manos, pies, cola... y qué rasgos son de cada individuo."
+              placeholder="Head, body, hands, feet, tail... and which traits belong to each individual."
               onChange={(e) => setSpeciesField({ species_prompt: e.target.value })}
             />
             <AnchorImage value={anchorPreview} onChange={(p) => setSpeciesField({ species_ref: p })} />
@@ -373,44 +373,44 @@ export function SettingsPage() {
             />
           </div>
         ) : (
-          <p className="text-sm text-muted">No hay anatomías. Los personajes se generarán sin anatomía de especie.</p>
+          <p className="text-sm text-muted">No anatomies. Characters will be generated without species anatomy.</p>
         )}
       </Section>
 
       <Section
-        title="Punto de vista"
-        description="Ajustes comunes a todas las plantillas, por tipo. Los mapas y los modelos 3D llevan aquí también su estilo propio."
+        title="Point of view"
+        description="Settings shared by all templates, per type. Maps and 3D models also have their own style here."
       >
-        <Segmented label="Tipo" value={kind} onChange={setKind} options={KIND_OPTIONS} stacked />
+        <Segmented label="Type" value={kind} onChange={setKind} options={KIND_OPTIONS} stacked />
         <div key={kind} className="grid gap-4">
-          {kind === 'modelo_3d' ? (
+          {kind === 'model_3d' ? (
             <TextArea
-              label="Estilo de escultura"
-              hint="Solo al preparar la imagen con FLUX 3 en modo escultura detallada."
+              label="Sculpture style"
+              hint="Only when preparing the image with FLUX 3 in detailed sculpture mode."
               minRows={6}
               value={draft.style_3d}
               onChange={(e) => update({ style_3d: e.target.value })}
             />
           ) : (
             <TextArea
-              label="Encuadre y cámara"
+              label="Framing and camera"
               minRows={7}
               value={draft.pov[kind] ?? ''}
               onChange={(e) => update({ pov: { ...draft.pov, [kind]: e.target.value } })}
             />
           )}
-          {kind === 'mapa' && (
+          {kind === 'map' && (
             <>
               <TextArea
-                label="Estilo de mapa"
-                hint="Sustituye al estilo de la plantilla, porque un mapa se dibuja como un mapa de cartógrafo."
+                label="Map style"
+                hint="Replaces the template style, because a map is drawn like a cartographer's map."
                 minRows={6}
                 value={draft.map_style}
                 onChange={(e) => update({ map_style: e.target.value })}
               />
               <TextArea
-                label="Restricciones de mapa"
-                hint="Sustituyen a las de la plantilla, porque un mapa necesita rótulos."
+                label="Map constraints"
+                hint="Replace the template's, because a map needs labels."
                 minRows={4}
                 value={draft.map_constraints}
                 onChange={(e) => update({ map_constraints: e.target.value })}
@@ -423,7 +423,7 @@ export function SettingsPage() {
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 backdrop-blur lg:left-[248px]">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-3 px-4 py-3 md:px-8">
           <Button variant="primary" onClick={save} disabled={!dirty || saving}>
-            <FloppyDisk size={16} /> {saving ? 'Guardando...' : 'Guardar'}
+            <FloppyDisk size={16} /> {saving ? 'Saving...' : 'Save'}
           </Button>
           {dirty && (
             <Button
@@ -433,7 +433,7 @@ export function SettingsPage() {
                 setStatus(null)
               }}
             >
-              Descartar cambios
+              Discard changes
             </Button>
           )}
           <p className="text-xs text-muted" role="status">
@@ -443,9 +443,9 @@ export function SettingsPage() {
                 {status.text}
               </span>
             ) : dirty ? (
-              'Hay cambios sin guardar.'
+              'There are unsaved changes.'
             ) : (
-              'Todo guardado.'
+              'All saved.'
             )}
           </p>
         </div>

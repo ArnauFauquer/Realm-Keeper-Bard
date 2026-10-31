@@ -6,8 +6,8 @@ services:
       - "127.0.0.1:8765:8765"
     env_file: .env
     volumes:
-      # todo lo que no es código: imágenes generadas, subidas, referencias,
-      # perfil de estilo, pesos GGUF (models/) y cachés de Hugging Face / rembg
+      # everything that is not code: generated images, uploads, references,
+      # style profile, GGUF weights (models/) and Hugging Face / rembg caches
       - ./data:/data
     deploy:
       resources:

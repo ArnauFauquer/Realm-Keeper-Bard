@@ -5,15 +5,15 @@ import { itemKey } from './Stage'
 import { Button, cx, Segmented } from './ui'
 
 export const FOLDER_LABELS: Record<LibraryFolder, string> = {
-  images: 'Generadas',
-  transparent: 'Sin fondo',
-  references: 'Referencias',
-  models: 'Modelos 3D',
+  images: 'Generated',
+  transparent: 'No background',
+  references: 'References',
+  models: '3D models',
 }
 
 const PAGE = 60
 
-/** Rejilla paginada de una carpeta de la app, de más reciente a más antigua. */
+/** Paginated grid of an app folder, newest to oldest. */
 export function LibraryGrid({
   folders,
   onPick,
@@ -69,7 +69,7 @@ export function LibraryGrid({
       {folders.length > 1 && (
         <div className="max-w-xl">
           <Segmented
-            label="Carpeta"
+            label="Folder"
             value={folder}
             onChange={setFolder}
             options={folders.map((f) => ({ value: f, label: FOLDER_LABELS[f] }))}
@@ -122,14 +122,14 @@ export function LibraryGrid({
       </ul>
 
       {!loading && !items.length && !error && (
-        <p className="py-10 text-center text-sm text-muted">Esta carpeta está vacía. Lo que generes aparecerá aquí.</p>
+        <p className="py-10 text-center text-sm text-muted">This folder is empty. Whatever you generate will appear here.</p>
       )}
 
       {!loading && items.length < total && (
         <div className="flex items-center justify-center gap-3">
-          <Button onClick={loadMore}>Cargar más</Button>
+          <Button onClick={loadMore}>Load more</Button>
           <span className="font-mono text-xs text-muted">
-            {items.length} de {total}
+            {items.length} of {total}
           </span>
         </div>
       )}

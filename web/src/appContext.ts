@@ -1,33 +1,33 @@
 import { createContext, useContext } from 'react'
 import type { Job, JobKind, Options, StyleData } from './api'
 
-export type PageKey = 'crear' | 'transformar' | 'quitar_fondo' | 'modelo_3d' | 'biblioteca' | 'ajustes'
-export type SendTarget = 'transformar' | 'quitar_fondo' | 'modelo_3d'
+export type PageKey = 'create' | 'transform' | 'remove_bg' | 'model_3d' | 'library' | 'settings'
+export type SendTarget = 'transform' | 'remove_bg' | 'model_3d'
 
-/** Página desde la que se lanza cada tipo de trabajo. */
+/** Page from which each job type is launched. */
 export const JOB_PAGE: Record<JobKind, PageKey> = {
-  create: 'crear',
-  transform: 'transformar',
-  remove_bg: 'quitar_fondo',
-  mesh: 'modelo_3d',
+  create: 'create',
+  transform: 'transform',
+  remove_bg: 'remove_bg',
+  mesh: 'model_3d',
 }
 
 export interface AppState {
   options: Options | null
   go: (key: PageKey) => void
-  /** Cola del servidor (todas las páginas), refrescada sola mientras haya trabajo. */
+  /** Server queue (all pages), refreshed automatically while there is work. */
   jobs: Job[]
   /** Mete o actualiza un trabajo en `jobs` sin esperar al siguiente sondeo. */
   trackJob: (job: Job) => void
-  /** Pone `path` como imagen de entrada de esa página y navega a ella. */
+  /** Set `path` as that page's input image and navigate to it. */
   sendTo: (target: SendTarget, path: string) => void
-  /** Imagen de entrada pendiente de cada página (la consumen las páginas). */
+  /** Pending input image for each page (consumed by the pages). */
   inbox: Partial<Record<SendTarget, { path: string; n: number }>>
-  /** Última imagen generada / sin fondo de la sesión (para "Usar la última"). */
+  /** Last generated / background-removed image of the session (for "Use the last one"). */
   lastGenerated: string | null
   lastTransparent: string | null
   noteResult: (path: string, transparent: boolean) => void
-  /** Plantillas de estilo/anatomía; Ajustes la sustituye al guardar. */
+  /** Style/anatomy templates; Settings replaces it on save. */
   library: StyleData | null
   setLibrary: (library: StyleData) => void
 }
@@ -36,6 +36,6 @@ export const AppContext = createContext<AppState | null>(null)
 
 export function useApp() {
   const ctx = useContext(AppContext)
-  if (!ctx) throw new Error('useApp fuera de AppContext')
+  if (!ctx) throw new Error('useApp outside AppContext')
   return ctx
 }

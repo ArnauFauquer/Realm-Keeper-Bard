@@ -1,11 +1,11 @@
-"""Perfil de estilo del mundo: el prompt de estilo y los de punto de vista.
+"""World style profile: the style prompt and the point-of-view prompts.
 
-Todos los prompts van en inglés (decisión del 24 oct 2026): los modelos de imagen
-locales entienden mucho mejor el inglés. Los comentarios siguen en español.
+All prompts are in English (decision of 24 Oct 2026): local image models
+understand English far better.
 
-Esto es lo que permite conservar el mismo enfoque visual entre imágenes
-generadas en momentos distintos: se define una vez y se reutiliza en cada
-generación (crear o transformar personajes/fondos/objetos).
+This is what keeps the same visual approach across images generated at
+different times: it is defined once and reused in every generation (create or
+transform characters/backgrounds/objects).
 """
 
 import json
@@ -14,13 +14,13 @@ from pathlib import Path
 
 from .config import DATA_DIR, STYLE_PATH
 
-CATEGORIES = ("personaje", "fondo", "objeto", "mapa")
+CATEGORIES = ("character", "background", "object", "map")
 
-# Descriptor de estilo fijo: se repite EXACTAMENTE igual en cada generación
-# (consistencia entre generaciones). Contorno grueso y limpio con pocas líneas internas (esto
-# es lo que el usuario pidió y validó). Respecto a la versión anterior, se
-# sustituyen los brillos planos tipo "pegatina" por un degradado de luz más
-# suave y continuo, y se recupera algo de matiz en la cara.
+# Fixed style descriptor: repeated EXACTLY the same in every generation
+# (consistency across generations). Thick, clean outline with few inner lines
+# (this is what the user asked for and validated). Compared with the previous
+# version, flat "sticker"-style highlights are replaced by a softer, continuous
+# light gradient, and some nuance is restored in the face.
 DEFAULT_STYLE_PROMPT = (
     "Clean fantasy illustration style, high-quality cartoon: thick, uniform "
     "black ink outline, with few inner lines. Avoid busy detail: no fine "
@@ -50,12 +50,11 @@ DEFAULT_CONSTRAINTS = (
     "interface elements of any kind in the image; only the illustration."
 )
 
-# Los mapas no usan el estilo ni las restricciones generales: el estilo
-# general está pensado para personajes (contorno grueso, luz dramática sobre
-# el sujeto) y las restricciones prohíben todo texto, pero un mapa necesita
-# los rótulos de los lugares. El prompt va en inglés, pero los nombres van en
-# español y entre comillas en la descripción para que el modelo los copie tal
-# cual en vez de traducirlos.
+# Maps use neither the general style nor the general constraints: the general
+# style is designed for characters (thick outline, dramatic light on the
+# subject) and the constraints forbid all text, but a map needs place labels.
+# The prompt is in English, but the names are given in quotes in the
+# description so the model copies them verbatim instead of translating them.
 DEFAULT_MAP_STYLE = (
     "Classic fantasy cartographer's map, in the style of Tolkien's maps or "
     "the Dungeons & Dragons supplements, hand-drawn with a dip pen on aged "
@@ -73,18 +72,18 @@ DEFAULT_MAP_STYLE = (
 DEFAULT_MAP_CONSTRAINTS = (
     "The only text allowed is the map labels: the region's name as a title in "
     "a cartouche and the name of each place next to its illustration. Write "
-    "them in SPANISH, copied letter by letter exactly as they appear in quotes "
-    "in the description, with their accents; do not translate them into "
-    "English and do not invent new names. Calligraphic old-map lettering, "
+    "them copied letter by letter exactly as they appear in quotes in the "
+    "description, in their original language and with their accents; do not "
+    "translate them and do not invent new names. Calligraphic old-map lettering, "
     "clear and legible. Each place is drawn and labeled only once: do not "
     "repeat any place or any label. Do not add any other text, legend, "
     "logo, watermark or interface element."
 )
 
-# Anatomía común de la especie (solo personajes). El estilo de arriba fija el
-# trazo, pero no la fisionomía: sin esto cada personaje salía con una anatomía
-# distinta (humanoide, anime o animal). Separa lo que es de la ESPECIE (se
-# unifica) de lo que es del INDIVIDUO (se conserva siempre).
+# Common species anatomy (characters only). The style above fixes the linework
+# but not the physiognomy: without this each character came out with a different
+# anatomy (humanoid, anime or animal). It separates what belongs to the SPECIES
+# (unified) from what belongs to the INDIVIDUAL (always preserved).
 DEFAULT_SPECIES_PROMPT = (
     "The characters are anthropomorphic rats with ANIMAL physiology, not "
     "human: a real rat that walks upright and wears clothes, not a person with "
@@ -107,15 +106,16 @@ DEFAULT_SPECIES_PROMPT = (
     "attitude and clothing, not by human anatomy."
 )
 
-# Imagen ancla de la especie: se adjunta como segunda referencia para que el
-# modelo vea la anatomía en vez de solo leerla. Ruta relativa a DATA_DIR.
-DEFAULT_SPECIES_REF = "referencias/especie_rata.jpg"
+# Species anchor image: attached as a second reference so the model sees the
+# anatomy instead of only reading it. Path relative to DATA_DIR.
+DEFAULT_SPECIES_REF = "references/species_rat.jpg"
 
-# Estilo SOLO para preparar la imagen que se convierte a 3D. Debe tener poca
-# "lógica": solo traduce el medio (dibujo -> escultura gris con relieve) y
-# prohíbe tocar lo demás. Cuanto más estilo propio se le añade (dark-fantasy,
-# anatomía realista, ceño...) más se aleja del personaje original (más
-# flaco, más duro, menos bonachón). No toca nada del estilo 2D.
+# Style ONLY for preparing the image that is converted to 3D. It should have
+# little "logic": it only translates the medium (drawing -> grey sculpture with
+# relief) and forbids touching anything else. The more own style is added
+# (dark fantasy, realistic anatomy, frown...) the further it drifts from the
+# original character (thinner, harsher, less good-natured). It doesn't touch the
+# 2D style at all.
 DEFAULT_STYLE_3D = (
     "Translate this illustration into a 3D sculpt without changing the character. Keep every "
     "detail of the drawing exactly as it is: same pose, same body shape, volumes and proportions "
@@ -132,12 +132,12 @@ DEFAULT_EXPRESSION_3D = (
     "character angrier, sadder, cuter or more menacing than in the reference."
 )
 
-# Personaje y objeto llevan un fondo liso de un solo color (sin textura, sin
-# degradado, sin sombra proyectada) para que el workflow de "quitar fondo"
-# (rembg) pueda recortarlos con bordes limpios. Tampoco llevan peana, base ni
-# terreno bajo el sujeto (nada que recortar aparte del propio personaje u
-# objeto). Los fondos de escena no llevan esta restricción porque están
-# pensados para ocupar todo el encuadre.
+# Characters and objects get a plain single-color background (no texture, no
+# gradient, no cast shadow) so the "remove background" workflow (rembg) can cut
+# them out with clean edges. They also get no pedestal, base or ground under the
+# subject (nothing to cut out besides the character or object itself). Scene
+# backgrounds don't have this constraint because they are meant to fill the
+# whole frame.
 FLAT_BACKGROUND_HINT = (
     "Background of a single flat, completely uniform color (light neutral "
     "grey), no textures, no gradients, no cast shadow on the background and no "
@@ -149,7 +149,7 @@ FLAT_BACKGROUND_HINT = (
 )
 
 DEFAULT_POV = {
-    "personaje": (
+    "character": (
         "TOP FRAMING PRIORITY: the character and absolutely everything they "
         "wear, carry, hold or drag (weapons, tails, wings, capes, chains, tied "
         "objects, etc.) must be fully visible inside the image, never cut off "
@@ -165,17 +165,17 @@ DEFAULT_POV = {
         "not cropped), three-quarter view with correct perspective, centered "
         f"vertical framing, standing. {FLAT_BACKGROUND_HINT}"
     ),
-    "fondo": (
+    "background": (
         "Wide horizontal establishing shot meant as a role-playing scene "
         "background, wide angle, horizon at mid height, good depth between "
         "foreground/midground/background, no characters in the foreground."
     ),
-    "objeto": (
+    "object": (
         "A single object centered in the frame like an inventory icon, "
         "three-quarter view, good studio lighting that brings out the "
         f"object's shape and material. {FLAT_BACKGROUND_HINT}"
     ),
-    "mapa": (
+    "map": (
         "Complete map of the region in landscape format, in a pure top-down "
         "view (from above, no perspective, no horizon); only the place "
         "vignettes are drawn in a slight three-quarter view. The whole region "
@@ -187,6 +187,16 @@ DEFAULT_POV = {
         "crowded or squeezed together. No characters."
     ),
 }
+
+
+# Data saved before the English rename used Spanish category keys and paths.
+_LEGACY_CATEGORIES = {"personaje": "character", "fondo": "background", "objeto": "object", "mapa": "map"}
+
+
+def _migrate_ref(path: str) -> str:
+    if path.startswith("referencias/"):
+        path = "references/" + path[len("referencias/"):]
+    return path.replace("especie_rata.jpg", "species_rat.jpg")
 
 
 @dataclass
@@ -204,13 +214,13 @@ class StyleProfile:
         return self.pov.get(category, "")
 
     def style_for(self, category: str) -> str:
-        return self.map_style if category == "mapa" else self.style_prompt
+        return self.map_style if category == "map" else self.style_prompt
 
     def constraints_for(self, category: str) -> str:
-        return self.map_constraints if category == "mapa" else self.constraints
+        return self.map_constraints if category == "map" else self.constraints
 
     def species_ref_path(self) -> str | None:
-        """Ruta absoluta de la imagen ancla, o None si no hay o no existe."""
+        """Absolute path of the anchor image, or None if there is none or it is missing."""
         if not self.species_ref:
             return None
         path = Path(self.species_ref)
@@ -224,7 +234,8 @@ class StyleProfile:
     @classmethod
     def from_dict(cls, data: dict) -> "StyleProfile":
         pov = dict(DEFAULT_POV)
-        pov.update(data.get("pov", {}))
+        # legacy Spanish category keys
+        pov.update({_LEGACY_CATEGORIES.get(k, k): v for k, v in data.get("pov", {}).items()})
         return cls(
             style_prompt=data.get("style_prompt", DEFAULT_STYLE_PROMPT),
             constraints=data.get("constraints", DEFAULT_CONSTRAINTS),
@@ -237,10 +248,10 @@ class StyleProfile:
         )
 
 
-# Desde el 25 oct 2026 el estilo general y la anatomía son plantillas con
-# nombre (se pueden tener varias y elegir una al generar); el punto de vista,
-# los mapas y el estilo 3D son comunes a todas. StyleProfile sigue siendo el
-# perfil "resuelto" que recibe generation.py.
+# Since 25 Oct 2026 the general style and the anatomy are named templates (you
+# can have several and pick one when generating); the point of view, maps and 3D
+# style are shared by all. StyleProfile is still the "resolved" profile that
+# generation.py receives.
 @dataclass
 class StylePreset:
     id: str
@@ -259,10 +270,10 @@ class SpeciesPreset:
 
 @dataclass
 class StyleLibrary:
-    styles: list = field(default_factory=lambda: [StylePreset("estilo", "Estilo del mundo")])
-    species: list = field(default_factory=lambda: [SpeciesPreset("rata", "Rata")])
-    active_style: str = "estilo"
-    active_species: str = "rata"
+    styles: list = field(default_factory=lambda: [StylePreset("style", "World style")])
+    species: list = field(default_factory=lambda: [SpeciesPreset("rat", "Rat")])
+    active_style: str = "style"
+    active_species: str = "rat"
     pov: dict = field(default_factory=lambda: dict(DEFAULT_POV))
     style_3d: str = DEFAULT_STYLE_3D
     map_style: str = DEFAULT_MAP_STYLE
@@ -277,8 +288,8 @@ class StyleLibrary:
         return by_id.get(species_id) if species_id else None
 
     def resolve(self, style_id: str | None = None, species_id: str | None = None) -> StyleProfile:
-        """Perfil plano con la plantilla de estilo y de anatomía elegidas (sin
-        anatomía: species_prompt vacío, que generation.py trata como desactivada)."""
+        """Flat profile with the chosen style and anatomy templates (without
+        anatomy: empty species_prompt, which generation.py treats as disabled)."""
         style = self.find_style(style_id)
         species = self.find_species(species_id)
         return StyleProfile(
@@ -298,15 +309,17 @@ class StyleLibrary:
     @classmethod
     def from_dict(cls, data: dict) -> "StyleLibrary":
         pov = dict(DEFAULT_POV)
-        pov.update(data.get("pov", {}))
+        # legacy Spanish category keys
+        pov.update({_LEGACY_CATEGORIES.get(k, k): v for k, v in data.get("pov", {}).items()})
         if "styles" not in data:
-            # formato antiguo (un único perfil plano): se convierte en una plantilla de cada
+            # old format (a single flat profile): converted into one template of each
             old = StyleProfile.from_dict(data)
-            styles = [StylePreset("estilo", "Estilo del mundo", old.style_prompt, old.constraints)]
-            species = [SpeciesPreset("rata", "Rata", old.species_prompt, old.species_ref)]
+            styles = [StylePreset("style", "World style", old.style_prompt, old.constraints)]
+            species = [SpeciesPreset("rat", "Rat", old.species_prompt, _migrate_ref(old.species_ref))]
         else:
-            styles = [StylePreset(**s) for s in data["styles"]] or [StylePreset("estilo", "Estilo del mundo")]
-            species = [SpeciesPreset(**s) for s in data.get("species", [])]
+            styles = [StylePreset(**s) for s in data["styles"]] or [StylePreset("style", "World style")]
+            species = [SpeciesPreset(**{**s, "species_ref": _migrate_ref(s.get("species_ref", ""))})
+                       for s in data.get("species", [])]
         return cls(
             styles=styles,
             species=species,

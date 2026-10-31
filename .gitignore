@@ -1,4 +1,4 @@
-# Secretos
+# Secrets
 .env
 
 # Python
@@ -10,17 +10,15 @@ __pycache__/
 web/node_modules/
 web/dist/
 
-# Datos de la app (volumen /data en Docker): no se versiona nada
+# App data (the /data volume in Docker): nothing is versioned
 data/
 *.log
 
-# Entorno 3D (pesado, se crea con setup_3d.ps1)
+# 3D environment (heavy, created by setup_3d.ps1)
 models_3d/venv/
 models_3d/trellis/
-models_3d/weights/
-models_3d/test/
 
-# Editor / sistema
+# Editor / system
 .vscode/
 .idea/
 .DS_Store

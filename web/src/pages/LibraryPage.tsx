@@ -9,7 +9,7 @@ import { SendActions } from '../components/Stage'
 import { fileUrl } from '../api'
 import { Button, Panel } from '../components/ui'
 
-/** Borrar pide un segundo clic: el primero solo arma el botón. */
+/** Deleting needs a second click: the first one only arms the button. */
 function DeleteButton({ item, onDeleted }: { item: ResultItem; onDeleted: () => void }) {
   const [armed, setArmed] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -38,11 +38,11 @@ function DeleteButton({ item, onDeleted }: { item: ResultItem; onDeleted: () => 
       {error && <span className="text-xs text-danger">{error}</span>}
       {armed && !busy && (
         <Button variant="ghost" className="h-9 px-3" onClick={() => setArmed(false)}>
-          Cancelar
+          Cancel
         </Button>
       )}
       <Button variant="danger" className="h-9 px-3" onClick={remove} disabled={busy}>
-        <Trash size={16} /> {armed ? (item.kind === 'image' ? '¿Borrar imagen?' : '¿Borrar modelo 3D?') : 'Borrar'}
+        <Trash size={16} /> {armed ? (item.kind === 'image' ? 'Delete image?' : 'Delete 3D model?') : 'Delete'}
       </Button>
     </div>
   )
@@ -56,7 +56,7 @@ export function LibraryPage({ refreshKey }: { refreshKey: number }) {
     <Panel className="p-5">
       <div className="mb-4 flex flex-wrap justify-end gap-2">
         <Button variant="ghost" onClick={() => setRefresh((n) => n + 1)}>
-          <ArrowsClockwise size={16} /> Actualizar
+          <ArrowsClockwise size={16} /> Refresh
         </Button>
       </div>
       <LibraryGrid
@@ -81,21 +81,21 @@ export function LibraryPage({ refreshKey }: { refreshKey: number }) {
                 <>
                   <SendActions path={open.path} onSent={() => setOpen(null)} />
                   <Button variant="ghost" className="h-9 px-3" onClick={() => api.open(open.path)}>
-                    <ArrowSquareOut size={16} /> Abrir con Windows
+                    <ArrowSquareOut size={16} /> Open with Windows
                   </Button>
                 </>
               ) : (
                 <>
                   {open.stl && (
                     <Button variant="ghost" className="h-9 px-3" onClick={() => api.open(open.stl!)}>
-                      <ArrowSquareOut size={16} /> Abrir STL
+                      <ArrowSquareOut size={16} /> Open STL
                     </Button>
                   )}
                   <Button variant="ghost" className="h-9 px-3" onClick={() => api.open(open.glb)}>
-                    <ArrowSquareOut size={16} /> Abrir GLB
+                    <ArrowSquareOut size={16} /> Open GLB
                   </Button>
                   <Button variant="ghost" className="h-9 px-3" onClick={() => api.open('generated_3d')}>
-                    <FolderOpen size={16} /> Carpeta
+                    <FolderOpen size={16} /> Folder
                   </Button>
                 </>
               )}

@@ -5,8 +5,8 @@ import { LibraryGrid } from './LibraryGrid'
 import { Modal } from './Modal'
 import { Button, cx, IconButton } from './ui'
 
-/** Imagen de entrada: arrastrar y soltar, pegar, subir, elegir de la
- *  biblioteca o reutilizar la última de la sesión. */
+/** Input image: drag and drop, paste, upload, pick from the
+ *  library or reuse the last one from the session. */
 export function ImageSource({
   label,
   value,
@@ -27,7 +27,7 @@ export function ImageSource({
   const [picking, setPicking] = useState(false)
   const zone = useRef<HTMLDivElement>(null)
 
-  // Ctrl+V en cualquier parte de la página visible (salvo si se escribe en un campo).
+  // Ctrl+V anywhere on the visible page (unless typing in a field).
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
       const file = e.clipboardData?.files[0]
@@ -43,7 +43,7 @@ export function ImageSource({
   const upload = async (file: File | undefined) => {
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      setError('Eso no es una imagen.')
+      setError('That is not an image.')
       return
     }
     setBusy(true)
@@ -64,7 +64,7 @@ export function ImageSource({
         ref={zone}
         tabIndex={0}
         role="button"
-        aria-label={`${label}: arrastra, pega o pulsa para subir una imagen`}
+        aria-label={`${label}: drag, paste or click to upload an image`}
         onClick={() => !value && input.current?.click()}
         onKeyDown={(e) => {
           if ((e.key === 'Enter' || e.key === ' ') && !value) input.current?.click()
@@ -91,7 +91,7 @@ export function ImageSource({
           <>
             <img src={thumbUrl(value, 480)} alt="" className="checker h-full w-full object-contain" />
             <IconButton
-              label="Quitar imagen"
+              label="Remove image"
               onClick={(e) => {
                 e.stopPropagation()
                 onChange(null)
@@ -104,8 +104,8 @@ export function ImageSource({
         ) : (
           <div className="grid justify-items-center gap-2 px-6 text-center">
             <UploadSimple size={22} className="text-muted" />
-            <p className="text-sm text-fg">Arrastra una imagen o pulsa para subirla</p>
-            <p className="text-xs text-muted">También puedes pegarla con Ctrl+V</p>
+            <p className="text-sm text-fg">Drag an image or click to upload it</p>
+            <p className="text-xs text-muted">You can also paste it with Ctrl+V</p>
           </div>
         )}
       </div>
@@ -121,15 +121,15 @@ export function ImageSource({
       />
       <div className="grid grid-cols-2 gap-2">
         <Button onClick={() => setPicking(true)}>
-          <Images size={16} /> Biblioteca
+          <Images size={16} /> Library
         </Button>
-        <Button disabled={!last} onClick={() => last && onChange(last)} title={last ? undefined : 'Aún no has generado nada en esta sesión'}>
-          <ClockCounterClockwise size={16} /> Usar la última
+        <Button disabled={!last} onClick={() => last && onChange(last)} title={last ? undefined : 'You have not generated anything yet in this session'}>
+          <ClockCounterClockwise size={16} /> Use the last one
         </Button>
       </div>
       {error && <p className="text-xs text-danger">{error}</p>}
 
-      <Modal open={picking} onClose={() => setPicking(false)} title="Elegir de la biblioteca" wide>
+      <Modal open={picking} onClose={() => setPicking(false)} title="Pick from the library" wide>
         <LibraryGrid
           folders={folders}
           dense

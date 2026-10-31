@@ -1,7 +1,7 @@
-// Cliente de la API de app/server.py. Las imágenes viajan como rutas relativas
-// a la raíz del proyecto ("generated_images/x.png").
+// Client for the app/server.py API. Images travel as paths relative to the
+// project root ("generated_images/x.png").
 
-export type Category = 'personaje' | 'fondo' | 'objeto' | 'mapa'
+export type Category = 'character' | 'background' | 'object' | 'map'
 
 export interface ImageItem {
   kind: 'image'
@@ -17,7 +17,7 @@ export interface MeshItem {
   kind: 'mesh'
   name: string
   glb: string
-  /** GLB con la textura horneada (solo para verlo; el STL no lleva color). */
+  /** GLB with the baked texture (view only; the STL carries no color). */
   glb_color?: string | null
   stl: string | null
   previews: string[]
@@ -38,7 +38,7 @@ export type JobKind = 'create' | 'transform' | 'remove_bg' | 'mesh'
 export interface Job {
   id: string
   kind: JobKind
-  /** Resumen corto para la cola ("personaje: una rata herrera..."). */
+  /** Short summary for the queue ("personaje: una rata herrera..."). */
   label: string
   status: 'queued' | 'running' | 'done' | 'error' | 'cancelled'
   progress: string
@@ -48,7 +48,7 @@ export interface Job {
   created: number
   started: number | null
   finished: number | null
-  /** Puesto en su fila mientras está en cola (1 = el siguiente). */
+  /** Position in its lane while queued (1 = next). */
   position: number
 }
 
@@ -85,7 +85,7 @@ export interface SpeciesPreset {
   species_ref_resolved?: string | null
 }
 
-/** Plantillas de estilo y de anatomía + ajustes comunes a todas. */
+/** Style and anatomy templates + settings shared by all. */
 export interface StyleData {
   styles: StylePreset[]
   species: SpeciesPreset[]

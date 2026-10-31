@@ -45,7 +45,7 @@ export function Modal({
           >
             <div className="flex items-center justify-between border-b border-line px-5 py-3">
               <h2 className="text-base font-semibold text-fg">{title}</h2>
-              <IconButton label="Cerrar" onClick={onClose}>
+              <IconButton label="Close" onClick={onClose}>
                 <X size={18} />
               </IconButton>
             </div>

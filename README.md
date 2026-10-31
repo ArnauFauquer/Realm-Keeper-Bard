@@ -1,58 +1,58 @@
 # RealmKeeper Bard
 
-Herramienta local para crear el arte de una campaña de rol con un estilo
-coherente: personajes, fondos, objetos y mapas, quitar fondos y convertir
-imágenes en modelos 3D imprimibles (STL).
+A local tool for creating tabletop RPG campaign art with a consistent style:
+characters, backgrounds, objects and maps, background removal, and turning
+images into printable 3D models (STL).
 
-- **Crear**: Krea 2 Turbo (texto → imagen).
-- **Transformar / editar**: FLUX 3 Image Klein (con imágenes de referencia).
-- **Quitar fondo**: rembg.
-- **3D**: Pixal3D vía trellis.cpp (solo Windows, fuera de Docker).
+- **Create**: Krea 2 Turbo (text → image).
+- **Transform / edit**: FLUX 3 Image Klein (with reference images).
+- **Remove background**: rembg.
+- **3D**: Pixal3D via trellis.cpp (Windows only, outside Docker).
 
-Los modelos de imagen corren dentro de la app con
-[diffusers](https://github.com/huggingface/diffusers), sin servicios externos.
+The image models run inside the app through
+[diffusers](https://github.com/huggingface/diffusers); no external services are needed.
 
-## Estructura
+## Layout
 
-| Ruta | Qué es |
+| Path | What it is |
 |---|---|
-| `app/` | Backend FastAPI (`server.py`), motor de imagen (`local_engine.py`), prompts y perfil de estilo |
-| `web/` | Frontend React + Vite + Tailwind; se compila a `web/dist` y lo sirve el backend |
-| `data/` | Todo lo que no es código (en Docker, el volumen `/data`) |
-| `data/referencias/` | Imágenes canon de las especies (anclas de estilo; las únicas versionadas) |
-| `data/models/` | Pesos GGUF de los transformers |
-| `data/world_style.json` | Perfil de estilo del mundo (lo edita la app) |
-| `data/generated_*`, `data/uploads/`, `data/thumbs/`, `data/cache/` | Resultados, subidas, miniaturas y cachés de Hugging Face / rembg |
-| `models_3d/` | Entorno aparte para imagen → 3D (`setup_3d.ps1`) |
+| `app/` | FastAPI backend (`server.py`), image engine (`local_engine.py`), prompts and style profile |
+| `web/` | React + Vite + Tailwind frontend; built to `web/dist` and served by the backend |
+| `data/` | Everything that is not code (in Docker, the `/data` volume); git-ignored |
+| `data/references/` | Canonical species reference images (style anchors) |
+| `data/models/` | GGUF transformer weights |
+| `data/world_style.json` | World style profile (edited by the app) |
+| `data/generated_*`, `data/uploads/`, `data/thumbs/`, `data/cache/` | Results, uploads, thumbnails and Hugging Face / rembg caches |
+| `models_3d/` | Separate environment for image → 3D (`setup_3d.ps1`) |
 
-## Pesos de los modelos
+## Model weights
 
-Copia en `data/models/`:
+Put these in `data/models/`:
 
 - `krea2_turbo-Q4_K_M.gguf`
 - `flux-3-image-klein-Q8_0.gguf` ([unsloth/flux-3-image-klein-GGUF](https://huggingface.co/unsloth/flux-3-image-klein-GGUF))
 
-El resto (encoder de texto Qwen3-VL 4B, VAE, configs) se descarga de Hugging Face
-la primera vez desde `krea/Krea-2-Turbo` y `black-forest-labs/flux-3-image-klein`.
-FLUX 3 Klein requiere aceptar su licencia en Hugging Face y poner un token en `.env`:
+The remaining components (Qwen3-VL 4B text encoder, VAE, configs) are downloaded
+from Hugging Face on first use from `krea/Krea-2-Turbo` and `black-forest-labs/flux-3-image-klein`.
+FLUX 3 Klein requires accepting its license on Hugging Face and setting a token in `.env`:
 
 ```
 HF_TOKEN=hf_...
 ```
 
-## Arrancar con Docker (recomendado)
+## Run with Docker (recommended)
 
-Requisitos: Docker Desktop con backend WSL2 y driver NVIDIA reciente (GPU con ≥10 GB de VRAM).
+Requirements: Docker Desktop with the WSL2 backend and a recent NVIDIA driver (GPU with ≥10 GB VRAM).
 
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
 
-La app queda en <http://localhost:8765>. Todos los datos viven en `data/`, montado
-como único volumen en `/data` (se puede cambiar con `DATA_DIR`).
+The app is served at <http://localhost:8765>. All data lives in `data/`, mounted
+as the single volume `/data` (override with `DATA_DIR`).
 
-## Arrancar sin Docker
+## Run without Docker
 
 ```bash
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
@@ -61,18 +61,18 @@ cd web && npm ci && npm run build && cd ..
 python main.py
 ```
 
-Para desarrollar el frontend con recarga en caliente: `python main.py` en una
-terminal y `npm run dev` dentro de `web/` en otra (Vite redirige `/api` al 8765).
+To develop the frontend with hot reload, run `python main.py` in one terminal and
+`npm run dev` inside `web/` in another (Vite proxies `/api` to port 8765).
 
 ## 3D
 
-La generación de mallas usa `models_3d/` (venv de Windows + trellis.cpp con CUDA),
-así que solo funciona arrancando la app en Windows sin Docker. Se instala con:
+Mesh generation uses `models_3d/` (a Windows venv + trellis.cpp with CUDA), so it
+only works when running the app on Windows without Docker. Install it with:
 
 ```bash
 powershell -ExecutionPolicy Bypass -File models_3d/setup_3d.ps1
 ```
 
-## Licencia
+## License
 
-[MIT-0](LICENSE). Los pesos de los modelos tienen sus propias licencias (FLUX 3 Klein: FLUX Kommunity License).
+[MIT-0](LICENSE). Model weights have their own licenses (FLUX 3 Klein: FLUX Kommunity License).

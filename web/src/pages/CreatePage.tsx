@@ -10,16 +10,16 @@ import { PresetSelects, usePresetChoice } from './presetChoice'
 import { RunBar, useResults, Workbench } from './Workbench'
 
 const PLACEHOLDERS: Record<Category, string> = {
-  personaje: 'Una rata herrera, gorda y risueña, con delantal de cuero y un martillo al hombro...',
-  fondo: 'La plaza del mercado de un pueblo de ratas al atardecer, vista amplia...',
-  objeto: 'Una linterna de latón con una luciérnaga atrapada dentro...',
-  mapa: 'La comarca de "Valle Bellota": el pueblo "Raíz Honda" junto al río y el "Bosque de los Susurros" al norte...',
+  character: 'A chubby, cheerful blacksmith rat with a leather apron and a hammer on their shoulder...',
+  background: 'The market square of a rat village at sunset, wide view...',
+  object: 'A brass lantern with a firefly trapped inside...',
+  map: 'The region of "Acorn Valley": the village of "Deep Root" by the river and the "Whispering Forest" to the north...',
 }
 
 export function CreatePage() {
   const { noteResult } = useApp()
   const results = useResults()
-  const [category, setCategory] = useState<Category>('personaje')
+  const [category, setCategory] = useState<Category>('character')
   const [description, setDescription] = useState('')
   const preset = usePresetChoice()
   const [removeBg, setRemoveBg] = useState(false)
@@ -37,9 +37,9 @@ export function CreatePage() {
       controls={
         <>
           <CategoryPicker value={category} onChange={setCategory} />
-          <PresetSelects isMap={category === 'mapa'} withSpecies={category === 'personaje'} choice={preset} />
+          <PresetSelects isMap={category === 'map'} withSpecies={category === 'character'} choice={preset} />
           <TextArea
-            label="Descripción"
+            label="Description"
             minRows={6}
             value={description}
             placeholder={PLACEHOLDERS[category]}
@@ -48,16 +48,16 @@ export function CreatePage() {
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && description.trim()) run()
             }}
             hint={
-              category === 'mapa'
-                ? 'Pon los nombres de los lugares entre comillas para que salgan escritos tal cual. Ctrl+Enter para generar.'
-                : 'Ctrl+Enter para generar.'
+              category === 'map'
+                ? 'Put place names in quotes so they are written exactly as given. Ctrl+Enter to generate.'
+                : 'Ctrl+Enter to generate.'
             }
           />
           <div className="grid gap-2">
-            <Toggle checked={removeBg} onChange={setRemoveBg} label="Quitar el fondo al terminar" />
+            <Toggle checked={removeBg} onChange={setRemoveBg} label="Remove the background when done" />
           </div>
           <RunBar
-            label="Generar imagen"
+            label="Generate image"
             icon={<PaintBrush size={18} />}
             running={job.running}
             queued={job.queued + (job.active ? 1 : 0)}
@@ -76,8 +76,8 @@ export function CreatePage() {
           progress={job.progress}
           elapsed={elapsed}
           category={category}
-          emptyTitle="Aquí aparecerá la imagen"
-          emptyHint="Describe lo que quieres a la izquierda. Se dibuja con el estilo de tu mundo definido en Ajustes."
+          emptyTitle="Your image will appear here"
+          emptyHint="Describe what you want on the left. It is drawn in your world style defined in Settings."
         />
       }
     />

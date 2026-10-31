@@ -1,10 +1,11 @@
-"""Servidor web de la app: expone los workflows de generación como API HTTP y
-sirve el frontend de navegador ya compilado (web/dist).
+"""App web server: exposes the generation workflows as an HTTP API and serves
+the compiled browser frontend (web/dist).
 
-Cada generación entra en una cola (/api/jobs la lista entera): las que usan la
-GPU (crear, transformar, 3D) van de una en una por la misma fila y quitar fondo
-por otra aparte, para que no espere detrás de un modelo 3D. Las imágenes se referencian por su ruta relativa a DATA_DIR
-("generated_images/x.png") y solo se sirven/abren las de ALLOWED_ROOTS.
+Every generation goes into a queue (/api/jobs lists them all): GPU jobs (create,
+transform, 3D) run one at a time in the same lane and background removal in a
+separate one, so it doesn't wait behind a 3D model. Images are referenced by
+their path relative to DATA_DIR ("generated_images/x.png") and only those under
+ALLOWED_ROOTS are served/opened.
 """
 
 import glob
@@ -52,7 +53,7 @@ ALLOWED_ROOTS = {
     "generated_transparent": TRANSPARENT_DIR,
     "generated_3d": MODELS_3D_OUTPUT_DIR,
     "uploads": UPLOAD_DIR,
-    "referencias": REFERENCES_DIR,
+    "references": REFERENCES_DIR,
 }
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
 LIBRARY_FOLDERS = {"images": OUTPUT_DIR, "transparent": TRANSPARENT_DIR, "references": REFERENCES_DIR}
@@ -64,18 +65,18 @@ def to_rel(path: str | Path) -> str:
 
 
 def resolve_rel(rel: str) -> Path:
-    """Ruta relativa del frontend -> ruta absoluta, solo dentro de ALLOWED_ROOTS."""
+    """Frontend relative path -> absolute path, only within ALLOWED_ROOTS."""
     path = (DATA_DIR / rel).resolve()
     for root in ALLOWED_ROOTS.values():
         if path == root.resolve() or root.resolve() in path.parents:
             return path
-    raise HTTPException(403, "Ruta fuera de las carpetas de la app.")
+    raise HTTPException(403, "Path outside the app folders.")
 
 
 def resolve_image(rel: str) -> str:
     path = resolve_rel(rel)
     if not path.is_file():
-        raise HTTPException(404, f"No existe la imagen {rel}.")
+        raise HTTPException(404, f"Image {rel} does not exist.")
     return str(path)
 
 
@@ -107,27 +108,27 @@ class EngineState:
     def __init__(self):
         self.engine = LocalEngine()
         self.status = "stopped"  # stopped | starting | ready | error
-        self.message = "Motor parado."
+        self.message = "Engine stopped."
         self.lock = threading.Lock()
 
     def start(self):
         with self.lock:
             if self.status == "starting":
                 return
-            self.status, self.message = "starting", "Arrancando el motor local..."
+            self.status, self.message = "starting", "Starting the local engine..."
 
         def worker():
             try:
                 self.engine.ensure_running()
-                self.status, self.message = "ready", "Motor local listo."
+                self.status, self.message = "ready", "Local engine ready."
             except Exception as exc:  # noqa: BLE001
-                self.status, self.message = "error", f"No arranca: {exc}"
+                self.status, self.message = "error", f"Failed to start: {exc}"
 
         threading.Thread(target=worker, daemon=True).start()
 
     def snapshot(self) -> dict:
         if self.status == "ready" and not self.engine.is_running():
-            self.status, self.message = "stopped", "El motor se ha detenido."
+            self.status, self.message = "stopped", "The engine has stopped."
         return {"status": self.status, "message": self.message}
 
 
@@ -138,7 +139,7 @@ class Job:
         self.label = label
         self.lane = lane
         self.fn = fn
-        self.model = model  # modelo de imagen que necesita ("krea" | "flux3"), o None
+        self.model = model  # image model it needs ("krea" | "flux3"), or None
         self.status = "queued"  # queued | running | done | error | cancelled
         self.progress = ""
         self.results: list[dict] = []
@@ -164,23 +165,23 @@ jobs: dict[str, Job] = {}
 last = {"generated": None, "transparent": None}
 
 KEEP_FINISHED = 80
-# Agrupar por modelo: cargar Krea o FLUX 3 cuesta ~30-60 s, así que primero van
-# los trabajos que usan el modelo ya cargado. Para que nadie espere sin fin, el
-# más antiguo pasa delante si lleva más de MAX_WAIT o tras MAX_STREAK saltos.
+# Group by model: loading Krea or FLUX 3 takes ~30-60 s, so jobs that use the
+# already-loaded model go first. So nobody waits forever, the oldest job goes
+# first once it has waited more than MAX_WAIT or after MAX_STREAK skips.
 MAX_WAIT = 600
 MAX_STREAK = 6
 
 
 class Lane:
-    """Cola de una fila de trabajo con un único worker."""
+    """Queue for one job lane with a single worker."""
 
     def __init__(self, name: str, model_aware: bool):
         self.name = name
         self.model_aware = model_aware
         self.pending: list[Job] = []
         self.cond = threading.Condition()
-        self.streak = 0  # trabajos seguidos que se han colado delante del más antiguo
-        self.model: str | None = None  # modelo del último trabajo que lo usaba (cargado o cargándose)
+        self.streak = 0  # consecutive jobs that have jumped ahead of the oldest
+        self.model: str | None = None  # model of the last job that used one (loaded or loading)
         threading.Thread(target=self._worker, daemon=True).start()
 
     def put(self, job: Job):
@@ -194,14 +195,14 @@ class Lane:
                 self.pending.remove(job)
 
     def _order(self) -> list[Job]:
-        """Orden en que saldrán los pendientes (sin contar el límite de espera)."""
+        """Order in which pending jobs will run (ignoring the wait limit)."""
         if not self.model_aware or not self.pending:
             return list(self.pending)
         oldest = self.pending[0]
         if self.streak >= MAX_STREAK or time.time() - oldest.created > MAX_WAIT:
             return [oldest, *self.pending[1:]]
         loaded = self.model or engine_state.engine.loaded
-        # estable: dentro de cada grupo se respeta el orden de llegada
+        # stable: within each group, arrival order is kept
         return sorted(self.pending, key=lambda j: j.model not in (None, loaded))
 
     def position(self, job: Job) -> int:
@@ -234,7 +235,7 @@ class Lane:
                 job.finished = time.time()
 
 
-# "gpu": los modelos de imagen y el 3D no caben a la vez en la VRAM. "light": quitar fondo.
+# "gpu": image models and 3D do not fit in VRAM together. "light": background removal.
 lanes = {"gpu": Lane("gpu", model_aware=True), "light": Lane("light", model_aware=False)}
 
 
@@ -254,17 +255,17 @@ def short(text: str, n: int = 60) -> str:
 
 
 def finish_image(job: Job, image_bytes: bytes, mime_type: str, prefix: str, remove_bg: bool):
-    """Guarda el resultado y, si se pidió, encadena quitar fondo."""
+    """Save the result and, if requested, chain background removal."""
     path = save_image_bytes(image_bytes, mime_type, OUTPUT_DIR, prefix)
     last["generated"] = path
     job.results.append(image_item(path))
     if not remove_bg:
         return
-    job.progress = "Imagen lista. Quitando fondo..."
+    job.progress = "Image ready. Removing background..."
     try:
-        out = save_image_bytes(remove_background(path), "image/png", TRANSPARENT_DIR, "sin_fondo")
+        out = save_image_bytes(remove_background(path), "image/png", TRANSPARENT_DIR, "no_background")
     except Exception as exc:  # noqa: BLE001
-        job.warning = f"Imagen generada, pero no se pudo quitar el fondo: {exc}"
+        job.warning = f"Image generated, but the background could not be removed: {exc}"
         return
     last["transparent"] = out
     job.results.append(image_item(out))
@@ -275,7 +276,7 @@ def finish_image(job: Job, image_bytes: bytes, mime_type: str, prefix: str, remo
 async def lifespan(_app: FastAPI):
     engine_state.start()
     yield
-    # Libera el modelo de imagen cargado (VRAM y RAM).
+    # Free the loaded image model (VRAM and RAM).
     engine_state.engine.stop()
 
 
@@ -309,7 +310,7 @@ def newest_image(folder: Path) -> Path | None:
 
 @app.get("/api/last")
 def get_last():
-    """Última imagen de la sesión; si aún no hay, la más reciente de la carpeta."""
+    """Latest image of the session; if there is none yet, the newest in the folder."""
     out = {}
     for key, folder in (("generated", OUTPUT_DIR), ("transparent", TRANSPARENT_DIR)):
         path = last[key] if last[key] and os.path.exists(last[key]) else newest_image(folder)
@@ -321,18 +322,18 @@ class CreateBody(BaseModel):
     category: str
     description: str
     style_id: str = ""
-    species_id: str = ""  # vacío = sin anatomía
+    species_id: str = ""  # empty = no anatomy
     remove_bg: bool = False
 
 
 @app.post("/api/create")
 def post_create(body: CreateBody):
     if not body.description.strip():
-        raise HTTPException(400, "Escribe qué quieres generar.")
+        raise HTTPException(400, "Describe what you want to generate.")
     profile = style_library.resolve(body.style_id, body.species_id)
 
     def fn(job: Job):
-        job.progress = "Generando imagen con Krea 2..."
+        job.progress = "Generating image with Krea 2..."
         data, mime = generate_create(engine_state.engine, profile, body.category, body.description,
                                      bool(body.species_id))
         finish_image(job, data, mime, body.category, body.remove_bg)
@@ -345,7 +346,7 @@ class TransformBody(BaseModel):
     is_map: bool = False
     extra: str = ""
     style_id: str = ""
-    species_id: str = ""  # vacío = sin anatomía
+    species_id: str = ""  # empty = no anatomy
     remove_bg: bool = False
 
 
@@ -355,7 +356,7 @@ def post_transform(body: TransformBody):
     profile = style_library.resolve(body.style_id, body.species_id)
 
     def fn(job: Job):
-        job.progress = "Transformando con FLUX 3..."
+        job.progress = "Transforming with FLUX 3..."
         data, mime = generate_transform(engine_state.engine, profile, ref, body.extra, body.is_map,
                                         bool(body.species_id))
         finish_image(job, data, mime, "mapa_estilizado" if body.is_map else "estilizado", body.remove_bg)
@@ -372,8 +373,8 @@ def post_remove_bg(body: SourceBody):
     src = resolve_image(body.source)
 
     def fn(job: Job):
-        job.progress = "Quitando fondo..."
-        out = save_image_bytes(remove_background(src), "image/png", TRANSPARENT_DIR, "sin_fondo")
+        job.progress = "Removing background..."
+        out = save_image_bytes(remove_background(src), "image/png", TRANSPARENT_DIR, "no_background")
         last["transparent"] = out
         job.results.append(image_item(out))
 
@@ -392,9 +393,9 @@ class MeshBody(BaseModel):
 @app.post("/api/mesh")
 def post_mesh(body: MeshBody):
     if not environment_ready():
-        raise HTTPException(400, "Falta el entorno 3D: ejecuta models_3d\\setup_3d.ps1.")
+        raise HTTPException(400, "The 3D environment is missing: run models_3d\\setup_3d.ps1.")
     source = resolve_image(body.source)
-    profile = style_library.resolve()  # el estilo 3D es común a todas las plantillas
+    profile = style_library.resolve()  # the 3D style is shared by all templates
     options = Mesh3DOptions(max_faces=body.faces_k * 1000,
                             height_mm=body.height_mm)
 
@@ -402,14 +403,14 @@ def post_mesh(body: MeshBody):
         image = source
         if body.prepare != "none":
             detailed = body.prepare == "detailed"
-            tag = "escultura" if detailed else "arcilla"
-            job.progress = f"Preparando la imagen con FLUX 3 ({tag})..."
+            tag = "sculpture" if detailed else "clay"
+            job.progress = f"Preparing the image with FLUX 3 ({tag})..."
             if detailed:
                 data, mime = prepare_for_3d_detailed(engine_state.engine, profile, source, body.expression)
             else:
                 data, mime = prepare_for_3d(engine_state.engine, source)
             raw = save_image_bytes(data, mime, OUTPUT_DIR, tag)
-            image = save_image_bytes(remove_background(raw), "image/png", TRANSPARENT_DIR, f"{tag}_sin_fondo")
+            image = save_image_bytes(remove_background(raw), "image/png", TRANSPARENT_DIR, f"{tag}_no_background")
             job.results.append({**image_item(image), "role": "prepared"})
         for i in range(body.variants):
             if job.cancelled:
@@ -437,7 +438,7 @@ def get_jobs():
 def get_job(job_id: str):
     job = jobs.get(job_id)
     if not job:
-        raise HTTPException(404, "Trabajo desconocido.")
+        raise HTTPException(404, "Unknown job.")
     return job.to_dict()
 
 
@@ -445,7 +446,7 @@ def get_job(job_id: str):
 def cancel_job(job_id: str):
     job = jobs.get(job_id)
     if not job:
-        raise HTTPException(404, "Trabajo desconocido.")
+        raise HTTPException(404, "Unknown job.")
     if job.status not in ("queued", "running"):
         return job.to_dict()
     job.cancelled = True
@@ -456,12 +457,12 @@ def cancel_job(job_id: str):
     proc = job.proc
     if proc and proc.poll() is None:
         if os.name == "nt":
-            # el worker 3D lanza a su vez trellis-cli: se mata el árbol entero
+            # the 3D worker in turn launches trellis-cli: kill the whole tree
             subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True,
                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         else:
             proc.kill()
-    job.progress = "Cancelando..."
+    job.progress = "Cancelling..."
     return job.to_dict()
 
 
@@ -469,7 +470,7 @@ def cancel_job(job_id: str):
 async def post_upload(file: UploadFile = File(...)):
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in IMAGE_EXTS:
-        raise HTTPException(400, "Formato de imagen no soportado.")
+        raise HTTPException(400, "Unsupported image format.")
     stem = Path(file.filename).stem[:40] or "imagen"
     out = UPLOAD_DIR / f"{stem}_{uuid.uuid4().hex[:6]}{suffix}"
     with out.open("wb") as f:
@@ -497,7 +498,7 @@ def get_library(folder: str = "images", offset: int = 0, limit: int = 60):
         return {"items": items, "total": len(files)}
     root = LIBRARY_FOLDERS.get(folder)
     if root is None:
-        raise HTTPException(400, "Carpeta desconocida.")
+        raise HTTPException(400, "Unknown folder.")
     files = sorted((p for p in root.rglob("*") if p.suffix.lower() in IMAGE_EXTS),
                    key=lambda p: p.stat().st_mtime, reverse=True)
     items = [{"kind": "image", "path": to_rel(p), "name": p.name, "mtime": p.stat().st_mtime}
@@ -511,25 +512,25 @@ class OpenBody(BaseModel):
 
 @app.post("/api/open")
 def post_open(body: OpenBody):
-    """Abre un fichero o carpeta con la aplicación de Windows (la app es local)."""
+    """Open a file or folder with the Windows application (the app is local)."""
     path = resolve_rel(body.path)
     if not path.exists():
-        raise HTTPException(404, "No existe.")
+        raise HTTPException(404, "Does not exist.")
     os.startfile(path)
     return {"ok": True}
 
 
 @app.post("/api/delete")
 def post_delete(body: OpenBody):
-    """Borra una imagen o un modelo 3D (su .glb con el .stl, el _color.glb y las
-    vistas previas) de la biblioteca, junto con sus miniaturas en caché."""
+    """Delete an image or 3D model (its .glb with the .stl, the _color.glb and the
+    previews) from the library, along with its cached thumbnails."""
     path = resolve_rel(body.path)
     if not path.is_file():
-        raise HTTPException(404, "No existe.")
+        raise HTTPException(404, "Does not exist.")
     rel = to_rel(path)
     used_by = [sp["name"] for sp in style_library.to_dict()["species"] if sp.get("species_ref") == rel]
     if used_by:
-        raise HTTPException(409, f"Es la referencia de la especie {', '.join(used_by)}; cámbiala antes de borrarla.")
+        raise HTTPException(409, f"It is the reference of species {', '.join(used_by)}; change it before deleting.")
     if path.suffix.lower() == ".glb":
         targets = [path, path.with_suffix(".stl"), path.with_name(f"{path.stem}_color.glb"),
                    *(MODELS_3D_OUTPUT_DIR / "previews").glob(f"{path.stem}_*.png"),
@@ -550,7 +551,7 @@ def post_delete(body: OpenBody):
 def style_payload() -> dict:
     data = style_library.to_dict()
     for sp in data["species"]:
-        # la ruta guardada puede no existir: el frontend previsualiza solo la resuelta
+        # the saved path may not exist: the frontend previews only the resolved one
         ref = style_library.resolve(None, sp["id"]).species_ref_path()
         sp["species_ref_resolved"] = to_rel(ref) if ref else None
     return data
@@ -588,14 +589,14 @@ class StyleBody(BaseModel):
 
 @app.put("/api/style")
 def put_style(body: StyleBody):
-    """Guarda la biblioteca entera (plantillas + comunes) de una vez."""
+    """Save the whole library (templates + shared) at once."""
     global style_library
     for sp in body.species:
         if sp.species_ref:
             resolve_rel(sp.species_ref)
     for group in (body.styles, body.species):
         if len({p.id for p in group}) != len(group):
-            raise HTTPException(400, "Hay dos plantillas con el mismo id.")
+            raise HTTPException(400, "Two templates share the same id.")
     style_library = StyleLibrary.from_dict(body.model_dump())
     save_style_library(style_library)
     return style_payload()
@@ -603,9 +604,9 @@ def put_style(body: StyleBody):
 
 # --------------------------------------------------------------- ficheros
 def glb_with_normals(path: Path) -> Path:
-    """Los GLB anteriores al 25 oct 2026 se exportaron sin normales y el visor
-    los pinta planos. Devuelve una copia en caché con normales por vértice (los
-    nuevos ya las traen y se sirven tal cual)."""
+    """GLBs from before 25 Oct 2026 were exported without normals and the viewer
+    renders them flat. Return a cached copy with per-vertex normals (newer ones
+    already have them and are served as is)."""
     import json
     import struct
 
@@ -666,14 +667,14 @@ def get_file(rel: str):
     if path.suffix.lower() == ".glb":
         try:
             return FileResponse(glb_with_normals(path), media_type="model/gltf-binary")
-        except Exception:  # noqa: BLE001 - GLB raro: mejor plano que nada
+        except Exception:  # noqa: BLE001 - odd GLB: better flat than nothing
             pass
     return FileResponse(path)
 
 
 @app.get("/thumbs/{rel:path}")
 def get_thumb(rel: str, s: int = 360):
-    """Miniatura WebP en caché (la biblioteca tiene cientos de imágenes de ~1 MP)."""
+    """Cached WebP thumbnail (the library has hundreds of ~1 MP images)."""
     path = resolve_rel(rel)
     if not path.is_file():
         raise HTTPException(404)

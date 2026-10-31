@@ -23,7 +23,7 @@ export function MeshPage() {
   })
   const elapsed = useElapsed(!!job.active, job.since)
 
-  const incoming = inbox.modelo_3d
+  const incoming = inbox.model_3d
   useEffect(() => {
     if (incoming) setSource(incoming.path)
   }, [incoming])
@@ -38,41 +38,41 @@ export function MeshPage() {
           {!ready && (
             <div className="flex gap-2 rounded-[10px] border border-danger/35 bg-danger/8 p-3 text-xs text-danger">
               <Warning size={16} className="shrink-0" />
-              Falta el entorno 3D: ejecuta models_3d\setup_3d.ps1.
+              The 3D environment is missing: run models_3d\setup_3d.ps1.
             </div>
           )}
           <ImageSource
-            label="Imagen"
+            label="Image"
             value={source}
             onChange={setSource}
             last={lastTransparent ?? lastGenerated}
             folders={['transparent', 'images', 'references']}
           />
           <Select
-            label="Preparar con FLUX 3"
+            label="Prepare with FLUX 3"
             value={prepare}
             onChange={setPrepare}
             options={options?.mesh_prepare_modes ?? []}
           />
           {prepare === 'detailed' && (
             <TextArea
-              label="Expresión y notas del personaje"
+              label="Character expression and notes"
               minRows={2}
               value={expression}
-              placeholder="Opcional. Si lo dejas vacío, conserva la expresión de la imagen."
+              placeholder="Optional. If left empty, the expression in the image is kept."
               onChange={(e) => setExpression(e.target.value)}
             />
           )}
           <div className="grid grid-cols-2 gap-3">
-            <NumberInput label="Alto (mm)" value={height} onChange={setHeight} min={10} max={999} step={5} />
-            <NumberInput label="Caras (miles)" value={faces} onChange={setFaces} min={50} max={3000} step={50} />
-            <NumberInput label="Variantes" value={variants} onChange={setVariants} min={1} max={6} />
+            <NumberInput label="Height (mm)" value={height} onChange={setHeight} min={10} max={999} step={5} />
+            <NumberInput label="Faces (thousands)" value={faces} onChange={setFaces} min={50} max={3000} step={50} />
+            <NumberInput label="Variants" value={variants} onChange={setVariants} min={1} max={6} />
           </div>
           <p className="-mt-2 text-xs leading-relaxed text-muted">
-            Cada variante usa una semilla aleatoria: son interpretaciones distintas de lo que no se ve en la imagen.
+            Each variant uses a random seed: they are different interpretations of whatever the image does not show.
           </p>
           <RunBar
-            label="Generar modelo 3D"
+            label="Generate 3D model"
             icon={<Cube size={18} />}
             running={job.running}
             queued={job.queued + (job.active ? 1 : 0)}
@@ -92,7 +92,7 @@ export function MeshPage() {
             }
             onCancel={job.cancel}
             error={job.error}
-            warning={job.latest?.status === 'cancelled' ? 'Generación cancelada.' : undefined}
+            warning={job.latest?.status === 'cancelled' ? 'Generation cancelled.' : undefined}
           />
         </>
       }
@@ -103,9 +103,9 @@ export function MeshPage() {
           running={job.running}
           progress={job.progress}
           elapsed={elapsed}
-          exclude="modelo_3d"
-          emptyTitle="Aquí aparecerá el modelo 3D"
-          emptyHint="Funciona mejor con una imagen sin fondo de un solo personaje u objeto. Podrás girarlo con el ratón."
+          exclude="model_3d"
+          emptyTitle="Your 3D model will appear here"
+          emptyHint="Works best with a background-free image of a single character or object. You can rotate it with the mouse."
         />
       }
     />

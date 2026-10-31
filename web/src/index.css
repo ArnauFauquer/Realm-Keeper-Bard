@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
-/* Tokens: neutros fríos + un único acento brasa. Radios: controles 10px,
-   paneles 16px, chips/pastillas full. Se usan en toda la app sin excepciones. */
+/* Tokens: cool neutrals + a single ember accent. Radii: controls 10px,
+   panels 16px, chips/pills full. Used throughout the app without exceptions. */
 :root {
   color-scheme: light;
   --bg: #eeeef0;
@@ -92,7 +92,7 @@ body {
   background: var(--accent-soft);
 }
 
-/* Damero para ver la transparencia de los PNG sin fondo. */
+/* Checkerboard to show the transparency of background-less PNGs. */
 .checker {
   background-color: var(--check-b);
   background-image: conic-gradient(var(--check-a) 25%, transparent 0 50%, var(--check-a) 0 75%, transparent 0);

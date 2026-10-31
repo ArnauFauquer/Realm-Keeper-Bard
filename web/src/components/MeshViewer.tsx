@@ -22,9 +22,9 @@ declare module 'react' {
   }
 }
 
-/** Visor 3D real del GLB: girar, acercar y mover con el ratón. Muestra la
- *  versión pintada (textura horneada por Pixal3D) si existe, o la arcilla, que
- *  es la geometría exacta del STL. model-viewer se carga solo al usarlo. */
+/** Real 3D viewer for the GLB: rotate, zoom and pan with the mouse. Shows the
+ *  painted version (texture baked by Pixal3D) if it exists, or the clay, which
+ *  is the exact STL geometry. model-viewer loads only when used. */
 export function MeshViewer({ item }: { item: MeshItem }) {
   const [ready, setReady] = useState(false)
   const [clay, setClay] = useState(false)
@@ -32,7 +32,7 @@ export function MeshViewer({ item }: { item: MeshItem }) {
     import('@google/model-viewer').then(() => setReady(true))
   }, [])
   const src = !clay && item.glb_color ? item.glb_color : item.glb
-  // run3d.py exporta la arcilla con material blanco metálico: se pasa a gris mate
+  // run3d.py exports the clay with a metallic white material: switch it to matte grey
   const viewer = useRef<HTMLElement>(null)
   useEffect(() => {
     const mv = viewer.current as
@@ -72,12 +72,12 @@ export function MeshViewer({ item }: { item: MeshItem }) {
       {item.glb_color && (
         <div
           role="radiogroup"
-          aria-label="Acabado"
+          aria-label="Finish"
           className="absolute top-3 left-3 flex gap-1 rounded-[10px] border border-line bg-surface/90 p-1 backdrop-blur"
         >
           {[
             { value: false, label: 'Color' },
-            { value: true, label: 'Arcilla' },
+            { value: true, label: 'Clay' },
           ].map((o) => (
             <button
               key={o.label}

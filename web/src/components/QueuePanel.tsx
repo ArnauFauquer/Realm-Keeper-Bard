@@ -16,20 +16,20 @@ const RECENT = 4
 function statusText(job: Job) {
   switch (job.status) {
     case 'running':
-      return job.progress || 'Trabajando...'
+      return job.progress || 'Working...'
     case 'queued':
-      return `En cola · puesto ${job.position}`
+      return `Queued · position ${job.position}`
     case 'done':
-      return job.warning || 'Hecho'
+      return job.warning || 'Done'
     case 'error':
       return 'Error'
     case 'cancelled':
-      return 'Cancelado'
+      return 'Cancelled'
   }
 }
 
-/** Cola global: lo que está en marcha, lo que espera y lo último terminado.
- *  Pulsar un trabajo lleva a la sección donde aparecen sus resultados. */
+/** Global queue: what is running, what is waiting and what finished last.
+ *  Clicking a job goes to the section where its results appear. */
 export function QueuePanel() {
   const { jobs, trackJob, go } = useApp()
   const active = jobs.filter(jobActive).sort((a, b) => {
@@ -43,7 +43,7 @@ export function QueuePanel() {
   if (!active.length && !recent.length) return null
 
   const row = (job: Job) => {
-    // la generación de imagen no se puede interrumpir a medias: en marcha solo se cancela el 3D
+    // image generation cannot be interrupted midway: while running, only 3D can be cancelled
     const cancellable = job.status === 'queued' || (job.status === 'running' && job.kind === 'mesh')
     return (
       <li key={job.id} className="group flex items-start gap-2">
@@ -86,8 +86,8 @@ export function QueuePanel() {
         {cancellable && (
           <button
             type="button"
-            aria-label="Cancelar"
-            title={job.status === 'queued' ? 'Quitar de la cola' : 'Cancelar'}
+            aria-label="Cancel"
+            title={job.status === 'queued' ? 'Remove from queue' : 'Cancel'}
             onClick={async () => trackJob(await api.cancel(job.id))}
             className="mt-1 inline-flex size-6 shrink-0 items-center justify-center rounded-[6px] text-muted hover:bg-danger/10 hover:text-danger"
           >
@@ -102,7 +102,7 @@ export function QueuePanel() {
     <div className="grid gap-2 rounded-2xl border border-line bg-bg p-3">
       <div className="flex items-center gap-2 px-0.5">
         <Queue size={16} className="text-muted" />
-        <span className="text-sm font-medium text-fg">Cola</span>
+        <span className="text-sm font-medium text-fg">Queue</span>
         {active.length > 0 && (
           <span className="ml-auto rounded-full bg-accent-soft px-2 py-0.5 font-mono text-[11px] text-accent">
             {active.length}

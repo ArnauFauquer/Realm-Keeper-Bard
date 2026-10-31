@@ -1,22 +1,22 @@
-"""Malla maciza para imprimir a partir de la "piel" que generan Pixal3D/TRELLIS.2.
+"""Solid printable mesh from the "skin" that Pixal3D/TRELLIS.2 generate.
 
-Los modelos no generan un sólido sino una piel hueca de grosor casi constante
-(~0,5% de la altura): pared exterior + pared interior, con el interior vacío y
-abierto al exterior por agujeros (p. ej. bajo los pies). Además la malla trae
-aristas no-manifold y orientación incoherente. El laminador solo rellena el
-contorno de cada capa y el hueco atrapa resina.
+The models don't generate a solid but a hollow skin of almost constant
+thickness (~0.5% of the height): outer wall + inner wall, with the interior
+empty and open to the outside through holes (e.g. under the feet). The mesh also
+has non-manifold edges and inconsistent orientation. The slicer only fills the
+outline of each layer and the cavity traps resin.
 
-`solidify` lo resuelve en dos fases que comparten las mismas rejillas de vóxeles:
+`solidify` solves it in two phases that share the same voxel grids:
 
-  1. Reparación a 2-manifold (lo que hacía Bambu Studio a mano): quita las caras
-     de aristas no-manifold, orienta cada cara hacia el lado sin pared cercana
-     (la otra pared de la piel está a ~1 grosor), propaga la orientación a las
-     caras dudosas, separa vértices con varios abanicos y cierra los agujeros
-     "en cremallera".
-  2. Relleno: un punto es interior si casi ninguna de 26 direcciones escapa al
-     exterior sin tocar la superficie; se genera un núcleo sólido que queda por
-     debajo de la superficie (dentro de la piel) y se une al original con
-     manifold3d. La superficie visible es la original al 100%.
+  1. Repair to 2-manifold (what Bambu Studio did by hand): remove faces on
+     non-manifold edges, orient each face towards the side with no nearby wall
+     (the other wall of the skin is ~1 thickness away), propagate the orientation
+     to the doubtful faces, split vertices with several fans and close the
+     "zipper" holes.
+  2. Fill: a point is interior if almost none of 26 directions escapes to the
+     outside without touching the surface; a solid core is generated that sits
+     below the surface (inside the skin) and is united with the original using
+     manifold3d. The visible surface is 100% the original.
 """
 
 import heapq
@@ -25,13 +25,13 @@ import itertools
 import numpy as np
 import trimesh
 
-# Rejillas en fracción del lado mayor del modelo (a 100 mm: 0,1 y 0,25 mm).
+# Grids as a fraction of the model's longest side (at 100 mm: 0.1 and 0.25 mm).
 FINE = 0.001
 COARSE = 0.0025
 
 
 def _edges(F: np.ndarray):
-    """Aristas dirigidas (3F, 2), su versión ordenada y la cara de cada una."""
+    """Directed edges (3F, 2), their sorted version and the face of each."""
     e = np.concatenate([F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]])
     return e, np.sort(e, axis=1), np.tile(np.arange(len(F)), 3)
 
@@ -51,10 +51,10 @@ def _is_ok(M) -> bool:
     return M.status() == m3d.Error.NoError
 
 
-# ----------------------------------------------------------------- vóxeles
+# ----------------------------------------------------------------- voxels
 
 def _surface_voxels(t: np.ndarray, h: float, lo: np.ndarray, shape) -> np.ndarray:
-    """Vóxeles atravesados por la superficie (muestreo denso de cada triángulo)."""
+    """Voxels crossed by the surface (dense sampling of each triangle)."""
     occ = np.zeros(shape, bool)
     a, b, c = t[:, 0], t[:, 1], t[:, 2]
     longest = np.maximum(np.linalg.norm(b - a, axis=1),
@@ -74,9 +74,9 @@ def _surface_voxels(t: np.ndarray, h: float, lo: np.ndarray, shape) -> np.ndarra
 
 
 def _escapes(occ: np.ndarray, d) -> np.ndarray:
-    """Por vóxel, cuántas de las dos semirrectas ±d (componentes en {-1,0,1})
-    salen de la rejilla sin tocar la superficie (0, 1 o 2). La recta diagonal se
-    convierte en un eje con una cizalla para usar acumulados."""
+    """Per voxel, how many of the two half-lines ±d (components in {-1,0,1})
+    leave the grid without touching the surface (0, 1 or 2). The diagonal line is
+    turned into an axis with a shear so cumulative sums can be used."""
     neg = [ax for ax in range(3) if d[ax] < 0]
     A = np.flip(occ, neg) if neg else occ
     d = np.abs(np.array(d))
@@ -105,22 +105,22 @@ def _escapes(occ: np.ndarray, d) -> np.ndarray:
 
 
 def _interior(t: np.ndarray, lo: np.ndarray, hc: float, shape) -> np.ndarray:
-    """Interior por rayos en la rejilla gruesa: como mucho 1 de 26 semirrectas
-    escapa. Se dilata una celda para que solape la pared interior de la piel."""
+    """Interior by rays on the coarse grid: at most 1 of 26 half-lines
+    escapes. Dilated by one cell so it overlaps the skin's inner wall."""
     from scipy import ndimage
 
     occ = _surface_voxels(t, hc, lo, shape)
     esc = np.zeros(shape, np.uint8)
     for d in itertools.product((-1, 0, 1), repeat=3):
-        if d != (0, 0, 0) and [x for x in d if x][0] > 0:  # 13 rectas = 26 semirrectas
+        if d != (0, 0, 0) and [x for x in d if x][0] > 0:  # 13 lines = 26 half-lines
             esc += _escapes(occ, d)
     return ndimage.binary_dilation((esc <= 1) & ~occ)
 
 
 def _orientation_hint(t: np.ndarray, occ: np.ndarray, lo: np.ndarray, hf: float) -> np.ndarray:
-    """+1 si la normal de la cara ya apunta al lado libre, -1 si al revés, 0 si
-    no se sabe. El lado "lleno" es el que tiene otra pared a menos de ~0,8% del
-    tamaño (la piel mide ~0,5%); se empieza a 2 celdas para saltar la propia."""
+    """+1 if the face normal already points to the free side, -1 if the opposite,
+    0 if unknown. The "full" side is the one with another wall within ~0.8% of
+    the size (the skin is ~0.5%); start at 2 cells to skip the face's own wall."""
     n = np.cross(t[:, 1] - t[:, 0], t[:, 2] - t[:, 0])
     n /= np.maximum(np.linalg.norm(n, axis=1), 1e-20)[:, None]
     cen = t.mean(1)
@@ -135,20 +135,20 @@ def _orientation_hint(t: np.ndarray, occ: np.ndarray, lo: np.ndarray, hf: float)
 
     fw, bw = first_hit(1), first_hit(-1)
     hint = np.zeros(len(t), np.int8)
-    hint[(bw < 99) & (fw == 99)] = 1   # pared detrás, libre delante: bien
-    hint[(fw < 99) & (bw == 99)] = -1  # pared delante: girar
+    hint[(bw < 99) & (fw == 99)] = 1   # wall behind, free in front: fine
+    hint[(fw < 99) & (bw == 99)] = -1  # wall in front: flip
     return hint
 
 
-# ----------------------------------------------------------------- reparación
+# ----------------------------------------------------------------- repair
 
 def _zip_hole(V: np.ndarray, loop: list[int], existing: set) -> np.ndarray | None:
-    """Tapa un agujero (ciclo de borde) recortando orejas: cada vez la que
-    añade la diagonal más corta, así las rendijas largas (lo típico al quitar
-    caras) se cierran como una cremallera, sin membranas. Se evitan diagonales
-    que ya existen en la malla (crearían aristas no-manifold)."""
+    """Cap a hole (boundary cycle) by ear clipping: each time the ear that
+    adds the shortest diagonal, so long slits (typical after removing faces) close
+    like a zipper, without membranes. Diagonals that already exist in the mesh
+    are avoided (they would create non-manifold edges)."""
     n = len(V)
-    loop = [int(v) for v in loop]  # enteros de Python: la clave no desborda
+    loop = [int(v) for v in loop]  # Python ints: the key does not overflow
     key = lambda a, b: min(a, b) * n + max(a, b)  # noqa: E731
     prev = {loop[i]: loop[i - 1] for i in range(len(loop))}
     nxt = {loop[i - 1]: loop[i] for i in range(len(loop))}
@@ -167,7 +167,7 @@ def _zip_hole(V: np.ndarray, loop: list[int], existing: set) -> np.ndarray | Non
         if c == np.inf:
             return None
         p, q = prev[v], nxt[v]
-        tris.append((q, v, p))  # el borde va p->v->q; la tapa lo recorre al revés
+        tris.append((q, v, p))  # the border runs p->v->q; the cap traverses it the other way
         existing.add(key(p, q))
         nxt[p], prev[q] = q, p
         del prev[v], nxt[v]
@@ -179,9 +179,9 @@ def _zip_hole(V: np.ndarray, loop: list[int], existing: set) -> np.ndarray | Non
 
 
 def _orient(F: np.ndarray, hint: np.ndarray) -> np.ndarray:
-    """Orienta las caras: las que tienen pista geométrica la usan; el resto la
-    hereda de sus vecinas por BFS (desde un nodo virtual unido a todas las caras
-    con pista, o a una cara cualquiera en las islas sin ninguna)."""
+    """Orient the faces: those with a geometric hint use it; the rest inherit it
+    from their neighbours by BFS (from a virtual node joined to all faces with a
+    hint, or to an arbitrary face in islands with none)."""
     from scipy.sparse import coo_matrix
     from scipy.sparse.csgraph import breadth_first_order, connected_components
 
@@ -191,8 +191,8 @@ def _orient(F: np.ndarray, hint: np.ndarray) -> np.ndarray:
     order = np.argsort(einv, kind="stable")
     pairs = order[cnt[einv[order]] == 2].reshape(-1, 2)
     fa, fb = fid[pairs[:, 0]], fid[pairs[:, 1]]
-    same = e[pairs[:, 0], 0] == e[pairs[:, 1], 0]  # misma dirección: hay que girar una
-    # caras sin pista en islas sin ninguna pista: se usa la primera como semilla
+    same = e[pairs[:, 0], 0] == e[pairs[:, 1], 0]  # same direction: one must be flipped
+    # faces without a hint in islands without any hint: the first is used as seed
     g = coo_matrix((np.ones(len(fa)), (fa, fb)), shape=(n, n))
     _, comp = connected_components(g, directed=False)
     seeded = np.zeros(comp.max() + 1, bool)
@@ -235,8 +235,8 @@ def _repair(V: np.ndarray, F: np.ndarray, hint: np.ndarray):
 
     F = _orient(F, hint)
     for _ in range(4):
-        # aristas dirigidas repetidas: dos caras vecinas con orientación
-        # incompatible; se quita la de la segunda semiarista (queda un agujero)
+        # repeated directed edges: two neighbouring faces with incompatible
+        # orientation; the one on the second half-edge is removed (leaves a hole)
         e, _, fid = _edges(F)
         _, first, dinv = np.unique(e, axis=0, return_index=True, return_inverse=True)
         dup = first[dinv.reshape(-1)] != np.arange(len(e))
@@ -246,14 +246,14 @@ def _repair(V: np.ndarray, F: np.ndarray, hint: np.ndarray):
         bad[fid[dup]] = True
         F, hint = F[~bad], hint[~bad]
 
-    # vértices con varios abanicos (pajarita): un vértice nuevo por abanico
+    # vertices with several fans (bow-tie): one new vertex per fan
     e, es, fid = _edges(F)
     corner = np.arange(3 * len(F)).reshape(3, -1).T  # esquina (cara, k) -> id
     _, einv, cnt = np.unique(es, axis=0, return_inverse=True, return_counts=True)
     order = np.argsort(einv, kind="stable")
     pairs = order[cnt[einv[order]] == 2].reshape(-1, 2)
     links = []
-    for side in (0, 1):  # los dos extremos de cada arista
+    for side in (0, 1):  # both ends of each edge
         a = e[pairs[:, 0], side]
         f0, f1 = fid[pairs[:, 0]], fid[pairs[:, 1]]
         k0 = np.argmax(F[f0] == a[:, None], axis=1)
@@ -267,8 +267,8 @@ def _repair(V: np.ndarray, F: np.ndarray, hint: np.ndarray):
     first[lab[corner.ravel()]] = F.ravel()
     V, F = V[first], lab[corner]
 
-    # agujeros: cada vértice de borde tiene una sola arista de borde saliente,
-    # así que los bordes forman ciclos simples
+    # holes: each boundary vertex has a single outgoing boundary edge,
+    # so the boundaries form simple cycles
     e, es, _ = _edges(F)
     _, einv, cnt = np.unique(es, axis=0, return_inverse=True, return_counts=True)
     b = e[cnt[einv] == 1]
@@ -291,7 +291,7 @@ def _repair(V: np.ndarray, F: np.ndarray, hint: np.ndarray):
             if v != start or len(loop) < 3:
                 return None
             tris = _zip_hole(V, loop, existing)
-            if tris is None:  # sin orejas válidas: abanico desde un vértice nuevo
+            if tris is None:  # no valid ears: fan from a new vertex
                 c = len(V) + len(new_v)
                 new_v.append(V[loop].mean(0))
                 tris = np.stack([np.roll(loop, -1), loop, np.full(len(loop), c)], 1)
@@ -300,7 +300,7 @@ def _repair(V: np.ndarray, F: np.ndarray, hint: np.ndarray):
             V = np.concatenate([V, np.array(new_v)])
         F = np.concatenate([F] + new_f)
 
-    # componentes enteras al revés (islas pequeñas sin pista fiable)
+    # whole components reversed (small islands without a reliable hint)
     _, es, _ = _edges(F)
     _, comp = connected_components(
         coo_matrix((np.ones(len(es)), (es[:, 0], es[:, 1])), shape=(len(V), len(V))), directed=False)
@@ -320,8 +320,8 @@ def _repair(V: np.ndarray, F: np.ndarray, hint: np.ndarray):
 # ----------------------------------------------------------------- todo junto
 
 def solidify(mesh: trimesh.Trimesh, fill: bool = True, progress=lambda msg: None):
-    """Devuelve (malla, rellena): la malla reparada a 2-manifold y, si `fill` y
-    es una piel, maciza. Si la reparación falla devuelve (None, False)."""
+    """Return (mesh, filled): the mesh repaired to 2-manifold and, if `fill` is set
+    and it is a skin, solid. If the repair fails, return (None, False)."""
     import manifold3d as m3d
     from scipy import ndimage
     from skimage.measure import marching_cubes
@@ -331,7 +331,7 @@ def solidify(mesh: trimesh.Trimesh, fill: bool = True, progress=lambda msg: None
     F = F[(F[:, 0] != F[:, 1]) & (F[:, 1] != F[:, 2]) & (F[:, 0] != F[:, 2])]
     _, keep = np.unique(np.sort(F, axis=1), axis=0, return_index=True)
     F = F[np.sort(keep)]
-    # caras en aristas compartidas por 3+ caras: fuera (se tapan después)
+    # faces on edges shared by 3+ faces: drop them (capped later)
     _, es, fid = _edges(F)
     _, einv, cnt = np.unique(es, axis=0, return_inverse=True, return_counts=True)
     bad = np.zeros(len(F), bool)
@@ -345,7 +345,7 @@ def solidify(mesh: trimesh.Trimesh, fill: bool = True, progress=lambda msg: None
     hi = V.max(0) + 4 * hc
     shf = tuple(np.ceil((hi - lo) / hf).astype(int) + 1)
 
-    progress("Reparando la malla (orientación y agujeros)...")
+    progress("Repairing the mesh (orientation and holes)...")
     occ = _surface_voxels(t, hf, lo, shf)
     rep = _repair(V, F, _orientation_hint(t, occ, lo, hf))
     if rep is None:
@@ -354,22 +354,22 @@ def solidify(mesh: trimesh.Trimesh, fill: bool = True, progress=lambda msg: None
     repaired = trimesh.Trimesh(V, F, process=False)
     M = _manifold(V, F)
     area = repaired.area
-    thick = 2 * M.volume() / area if area > 0 else 0  # grosor medio de la piel
+    thick = 2 * M.volume() / area if area > 0 else 0  # mean skin thickness
     if not fill or not 0 < thick < 0.02 * size:
-        return repaired, False  # ya es un sólido (o no se pide rellenar)
+        return repaired, False  # already a solid (or filling not requested)
 
-    progress("Rellenando la piel: buscando el interior...")
+    progress("Filling the skin: finding the interior...")
     shc = tuple(np.ceil((hi - lo) / hc).astype(int) + 1)
     inside = _interior(t, lo, hc, shc)
-    progress("Rellenando la piel: núcleo sólido...")
+    progress("Filling the skin: solid core...")
     ci = [np.minimum((np.arange(n) * hf / hc).astype(int), shc[a] - 1) for a, n in enumerate(shf)]
     for x in range(shf[0]):
         occ[x] |= inside[ci[0][x]][np.ix_(ci[1], ci[2])]
     del inside
     lab, _ = ndimage.label(~occ)
-    solid = lab != lab[0, 0, 0]  # todo lo que no es exterior
+    solid = lab != lab[0, 0, 0]  # everything that is not exterior
     del lab, occ
-    # núcleo ~0,6 grosores bajo la superficie: queda dentro de la piel
+    # core ~0.6 thicknesses below the surface: stays inside the skin
     erode = max(1, round(0.6 * thick / hf))
     core = ndimage.binary_erosion(solid, ndimage.generate_binary_structure(3, 1), iterations=erode)
     del solid
@@ -377,16 +377,16 @@ def solidify(mesh: trimesh.Trimesh, fill: bool = True, progress=lambda msg: None
         return repaired, False
     cv, cf, _, _ = marching_cubes(np.pad(core, 1).astype(np.float32), 0.5)
     del core
-    cv = (cv - 1 + 0.5) * hf + lo  # índice de vóxel -> centro de la celda
+    cv = (cv - 1 + 0.5) * hf + lo  # voxel index -> cell centre
     C = _manifold(cv, cf)
     if not _is_ok(C) or C.volume() < 0:
         C = _manifold(cv, cf[:, ::-1])
     if not _is_ok(C):
         return repaired, False
 
-    progress("Rellenando la piel: uniendo...")
+    progress("Filling the skin: joining...")
     R = M + C.simplify(hf * 0.1)
-    # burbujas cerradas que queden dentro: atraparían resina
+    # closed bubbles left inside: they would trap resin
     R = m3d.Manifold.compose([p for p in R.decompose() if p.volume() > 0])
     if not _is_ok(R) or R.volume() <= M.volume():
         return repaired, False

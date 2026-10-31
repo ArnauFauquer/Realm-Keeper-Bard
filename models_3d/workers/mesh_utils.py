@@ -1,6 +1,6 @@
-"""Post-proceso de mallas: malla estanca para imprimir (vóxeles + reproyección),
-exportación a STL (eje Z arriba, escalado a milímetros) y render de vistas
-previas por GPU (OpenGL, con respaldo por software) para la GUI."""
+"""Mesh post-processing: watertight printable mesh (voxels + reprojection),
+STL export (Z up, scaled to millimetres) and GPU preview rendering (OpenGL,
+with a software fallback) for the app."""
 
 import math
 from pathlib import Path
@@ -11,38 +11,27 @@ import trimesh
 from PIL import Image, ImageDraw
 
 
-def to_single_mesh(obj) -> trimesh.Trimesh:
-    """Convierte una escena (GLB con varios nodos) en una única malla,
-    aplicando las transformaciones de cada nodo."""
-    if isinstance(obj, trimesh.Scene):
-        meshes = [g for g in obj.dump(concatenate=False) if isinstance(g, trimesh.Trimesh)]
-        if not meshes:
-            raise RuntimeError("El modelo generado no contiene ninguna malla.")
-        return meshes[0] if len(meshes) == 1 else trimesh.util.concatenate(meshes)
-    return obj
-
-
 def clean_mesh(mesh: trimesh.Trimesh, max_faces: int) -> trimesh.Trimesh:
-    """Elimina islas pequeñas y caras degeneradas y reduce el número de caras
-    con decimación cuádrica (pymeshlab) si supera `max_faces`."""
+    """Remove small islands and degenerate faces and reduce the face count
+    with quadric decimation (pymeshlab) if it exceeds `max_faces`."""
     ms = pymeshlab.MeshSet()
     ms.add_mesh(pymeshlab.Mesh(vertex_matrix=mesh.vertices, face_matrix=mesh.faces))
-    # suelda las costuras UV (vértices duplicados en la misma posición); el
-    # umbral por defecto (1% de la diagonal) se comería detalle fino
+    # weld UV seams (duplicate vertices at the same position); the default
+    # threshold (1% of the diagonal) would eat fine detail
     ms.meshing_merge_close_vertices(threshold=pymeshlab.PercentageValue(0.01))
     ms.meshing_remove_duplicate_faces()
     ms.meshing_remove_null_faces()
-    # quita "flotantes": componentes con menos del 1% del diámetro
+    # remove "floaters": components smaller than 1% of the diameter
     ms.meshing_remove_connected_component_by_diameter(
         mincomponentdiag=pymeshlab.PercentageValue(1)
     )
-    # decimar ANTES de reparar: tras close_holes la decimación cuádrica deja de
-    # reducir en mallas grandes (p. ej. la malla completa de TRELLIS.2)
+    # decimate BEFORE repairing: after close_holes quadric decimation stops
+    # reducing on large meshes (e.g. the full TRELLIS.2 mesh)
     if max_faces > 0 and ms.current_mesh().face_number() > max_faces:
         ms.meshing_decimation_quadric_edge_collapse(
             targetfacenum=max_faces, preservenormal=True, planarquadric=True
         )
-    try:  # cierra agujeros pequeños para que el STL sea imprimible
+    try:  # close small holes so the STL is printable
         ms.meshing_repair_non_manifold_edges()
         ms.meshing_close_holes(maxholesize=200)
     except pymeshlab.PyMeshLabException:
@@ -54,9 +43,9 @@ def clean_mesh(mesh: trimesh.Trimesh, max_faces: int) -> trimesh.Trimesh:
 
 
 def subdivide_mesh(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
-    """Una iteración de subdivisión Loop (x4 caras): redondea las facetas planas
-    de una malla ya reducida sin inventar detalle. clean_mesh la vuelve a
-    reducir después al máximo de caras pedido."""
+    """One Loop subdivision iteration (x4 faces): rounds the flat facets of an
+    already-reduced mesh without inventing detail. clean_mesh reduces it again
+    afterwards to the requested maximum face count."""
     ms = pymeshlab.MeshSet()
     ms.add_mesh(pymeshlab.Mesh(vertex_matrix=mesh.vertices, face_matrix=mesh.faces))
     ms.meshing_merge_close_vertices(threshold=pymeshlab.PercentageValue(0.01))
@@ -67,10 +56,10 @@ def subdivide_mesh(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
 
 
 def repair_light(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
-    """Reparación que no toca la forma: quita caras duplicadas o degeneradas,
-    separa aristas/vértices no-manifold, cierra agujeritos y unifica la
-    orientación. La malla del remallado oficial de TRELLIS ya es casi estanca;
-    lo que quede lo corrige cualquier laminador."""
+    """Repair that doesn't touch the shape: removes duplicate or degenerate
+    faces, splits non-manifold edges/vertices, closes tiny holes and unifies the
+    orientation. The mesh from the official TRELLIS remeshing is already almost
+    watertight; any slicer fixes what remains."""
     ms = pymeshlab.MeshSet()
     ms.add_mesh(pymeshlab.Mesh(vertex_matrix=mesh.vertices, face_matrix=mesh.faces))
     ms.meshing_remove_duplicate_faces()
@@ -87,37 +76,37 @@ def repair_light(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
 
 
 def make_printable(mesh: trimesh.Trimesh, max_faces: int, grid: int = 1024) -> trimesh.Trimesh:
-    """Malla estanca (watertight/manifold) lista para imprimir, sin perder detalle.
+    """Watertight/manifold mesh ready to print, without losing detail.
 
-    La salida de TRELLIS.2 trae cientos de agujeritos, aristas no-manifold y
-    estructuras internas; los reparadores clásicos (pymeshfix, close_holes) o no
-    la cierran o destrozan el modelo. En su lugar:
-      1. superficie de referencia: la malla tal cual si es densa, o subdividida
-         (Loop) si viene reducida y tiene facetas;
-      2. vóxeles: se muestrea la superficie en una rejilla de `grid` celdas en el
-         eje mayor, se dilata una celda (cierra los agujeros) y se rellena el
-         interior; marching cubes da una superficie cerrada por construcción;
-      3. reducción rápida de caras (fast-simplification) hasta `max_faces`;
-      4. reproyección de cada vértice sobre la superficie de referencia: la
-         topología cerrada sale del vóxel y la forma exacta, del original.
+    TRELLIS.2 output has hundreds of tiny holes, non-manifold edges and internal
+    structures; classic repairers (pymeshfix, close_holes) either don't close it
+    or wreck the model. Instead:
+      1. reference surface: the mesh as is if dense, or subdivided (Loop) if it
+         comes reduced and faceted;
+      2. voxels: sample the surface on a grid of `grid` cells along the longest
+         axis, dilate one cell (closes the holes) and fill the interior;
+         marching cubes yields a surface that is closed by construction;
+      3. fast face reduction (fast-simplification) down to `max_faces`;
+      4. reproject each vertex onto the reference surface: the closed topology
+         comes from the voxels and the exact shape from the original.
     """
     import fast_simplification
     from scipy import ndimage
     from skimage import measure
 
-    # la malla completa de TRELLIS (sin textura, millones de caras) ya no tiene
-    # facetas; la reducida del GLB texturizado sí: esa se subdivide
+    # the full TRELLIS mesh (untextured, millions of faces) has no facets left;
+    # the reduced one from the textured GLB does: that one gets subdivided
     ref = subdivide_mesh(mesh) if len(mesh.faces) < 1_500_000 else mesh
     lo, hi = ref.bounds
     pitch = float((hi - lo).max()) / grid
-    # ~4 muestras por celda de superficie: ninguna celda atravesada queda vacía
+    # ~4 samples per surface cell: no crossed cell is left empty
     samples, _ = trimesh.sample.sample_surface(ref, int(ref.area / (pitch * 0.5) ** 2))
     idx = np.floor((samples - lo) / pitch).astype(np.int32) + 2
     occ = np.zeros(idx.max(axis=0) + 3, dtype=bool)
     occ[idx[:, 0], idx[:, 1], idx[:, 2]] = True
     del samples, idx
-    # sin erosión posterior: la capa extra se elimina al reproyectar y evita que
-    # las partes finas (filos, dedos) se rompan en la rejilla
+    # no erosion afterwards: the extra layer is removed when reprojecting and
+    # keeps thin parts (blades, fingers) from breaking on the grid
     occ = ndimage.binary_fill_holes(ndimage.binary_dilation(occ))
     field = ndimage.gaussian_filter(occ.astype(np.float32), 0.8)
     del occ
@@ -137,7 +126,7 @@ def make_printable(mesh: trimesh.Trimesh, max_faces: int, grid: int = 1024) -> t
     ms.add_mesh(pymeshlab.Mesh(vertex_matrix=np.asarray(verts, np.float64),
                                face_matrix=np.asarray(faces, np.int32)))
     ms.set_current_mesh(1)
-    # piezas sueltas diminutas (motas del vóxel)
+    # tiny loose pieces (voxel specks)
     ms.meshing_remove_connected_component_by_diameter(
         mincomponentdiag=pymeshlab.PercentageValue(1)
     )
@@ -149,9 +138,9 @@ def make_printable(mesh: trimesh.Trimesh, max_faces: int, grid: int = 1024) -> t
     )
     m = ms.current_mesh()
     after = m.vertex_matrix().copy()
-    # En zonas muy finas dos vértices distintos pueden caer en el mismo punto
-    # (el STL los fusionaría y aparecerían aristas no-manifold): esos vuelven a
-    # su posición del vóxel, que es cerrada por construcción.
+    # In very thin areas two distinct vertices can land on the same point
+    # (the STL would merge them and non-manifold edges would appear): those go
+    # back to their voxel position, which is closed by construction.
     for _ in range(3):
         key = np.round(after / (pitch * 1e-3)).astype(np.int64)
         _, inverse, counts = np.unique(key, axis=0, return_inverse=True, return_counts=True)
@@ -163,9 +152,9 @@ def make_printable(mesh: trimesh.Trimesh, max_faces: int, grid: int = 1024) -> t
 
 
 def export_stl(mesh: trimesh.Trimesh, path: Path, height_mm: float) -> dict:
-    """Los modelos generan en Y-arriba (convención glTF); los laminadores de
-    impresión 3D esperan Z-arriba. Se rota, se escala a `height_mm` de alto y se
-    apoya el modelo sobre la cama (z = 0) centrado en XY."""
+    """Models are generated Y-up (glTF convention); 3D-printing slicers expect
+    Z-up. Rotate, scale to `height_mm` tall and rest the model on the bed
+    (z = 0), centred in XY."""
     m = mesh.copy()
     m.apply_transform(trimesh.transformations.rotation_matrix(math.pi / 2, [1, 0, 0]))
     extents = m.extents
@@ -182,8 +171,8 @@ def export_stl(mesh: trimesh.Trimesh, path: Path, height_mm: float) -> dict:
 
 
 def is_manifold(mesh: trimesh.Trimesh) -> bool:
-    """Estanca y 2-manifold según manifold3d (la librería de booleanas que usan
-    muchos laminadores); más fiable que is_watertight de trimesh."""
+    """Watertight and 2-manifold according to manifold3d (the boolean library
+    many slicers use); more reliable than trimesh's is_watertight."""
     try:
         import manifold3d
 
@@ -197,18 +186,18 @@ def is_manifold(mesh: trimesh.Trimesh) -> bool:
 
 
 def _face_colors(mesh: trimesh.Trimesh) -> np.ndarray | None:
-    """Color RGB por cara a partir de la textura/colores de vértice, si los hay."""
+    """Per-face RGB color from the texture/vertex colors, if any."""
     try:
         visual = mesh.visual
         if visual.kind not in ("texture", "vertex", "face"):
-            return None  # sin color propio (trimesh pondría un gris por defecto)
+            return None  # no color of its own (trimesh would use a default grey)
         if isinstance(visual, trimesh.visual.TextureVisuals):
             visual = visual.to_color()
         vc = np.asarray(visual.vertex_colors)[:, :3].astype(np.float32)
         if len(vc) != len(mesh.vertices):
             return None
         return vc[mesh.faces].mean(axis=1)
-    except Exception:  # noqa: BLE001 - sin textura válida se usa el color por defecto
+    except Exception:  # noqa: BLE001 - without a valid texture the default color is used
         return None
 
 
@@ -224,7 +213,7 @@ void main() {
     vec3 p = rot * in_pos;
     v_normal = rot * in_normal;
     v_color = in_color;
-    // ortográfica; z hacia el observador = más cerca
+    // orthographic; z towards the viewer = closer
     gl_Position = vec4(p.x, p.y, -p.z * 0.5, 1.0);
 }
 """
@@ -267,15 +256,15 @@ def _vertex_colors(mesh: trimesh.Trimesh) -> np.ndarray | None:
 
 
 def _render_gpu(mesh, out_dir, stem, frames, size, pitch_deg, only, smooth=True) -> list[str]:
-    """Render por GPU (OpenGL vía moderngl): z-buffer, MSAA 8x y sombreado suave
-    (normales por vértice, como un visor 3D) o plano por cara (`smooth=False`,
-    útil para inspeccionar la triangulación)."""
+    """GPU render (OpenGL via moderngl): z-buffer, 8x MSAA and smooth shading
+    (per-vertex normals, like a 3D viewer) or flat per face (`smooth=False`,
+    useful for inspecting the triangulation)."""
     import moderngl
 
     verts = mesh.vertices - mesh.bounding_box.centroid
     verts = verts * (0.84 / max(np.linalg.norm(verts, axis=1).max(), 1e-6))
     faces = np.asarray(mesh.faces)
-    tri = verts[faces].astype(np.float32)  # (F, 3, 3) sin indexar: normal por cara
+    tri = verts[faces].astype(np.float32)  # (F, 3, 3) unindexed: per-face normal
     fn = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
     fn /= np.maximum(np.linalg.norm(fn, axis=1, keepdims=True), 1e-12)
     if smooth:
@@ -307,7 +296,7 @@ def _render_gpu(mesh, out_dir, stem, frames, size, pitch_deg, only, smooth=True)
             if only is not None and i not in only:
                 continue
             yaw = 2 * math.pi * i / frames + math.radians(30)
-            # moderngl espera matrices por columnas
+            # moderngl expects column-major matrices
             prog["rot"].write(_view_matrix(yaw, math.radians(pitch_deg)).T.astype("f4").tobytes())
             msaa.use()
             msaa.clear(0.0, 0.0, 0.0, 0.0, depth=1.0)
@@ -333,12 +322,12 @@ def render_turntable(
     only: set[int] | None = None,
     smooth: bool = True,
 ) -> list[str]:
-    """Renderiza `frames` vistas girando alrededor del eje vertical (Y).
-    Usa la GPU (OpenGL) si está disponible; si no, el algoritmo del pintor en
-    CPU. `only` limita qué fotogramas se renderizan. Devuelve las rutas."""
+    """Render `frames` views rotating around the vertical axis (Y).
+    Uses the GPU (OpenGL) if available; otherwise the painter's algorithm on
+    CPU. `only` limits which frames are rendered. Returns the paths."""
     try:
         return _render_gpu(mesh, out_dir, stem, frames, size, pitch_deg, only, smooth)
-    except Exception:  # noqa: BLE001 - sin OpenGL: render por software
+    except Exception:  # noqa: BLE001 - no OpenGL: software render
         pass
     verts = mesh.vertices - mesh.bounding_box.centroid
     scale = 0.84 / max(np.linalg.norm(verts, axis=1).max(), 1e-6)
@@ -348,7 +337,7 @@ def render_turntable(
     if base is None:
         base = np.tile(np.array([[196, 178, 150]], np.float32), (len(faces), 1))
 
-    ss = 2  # supermuestreo para suavizar bordes
+    ss = 2  # supersampling to smooth edges
     px = size * ss
     light = np.array([0.35, 0.55, 0.75])
     light /= np.linalg.norm(light)
@@ -374,7 +363,7 @@ def render_turntable(
         n = normals[idx] / norm_len[idx, None]
         shade = 0.42 + 0.78 * np.clip(n @ light, 0, 1)
         colors = np.clip(base[idx] * shade[:, None], 0, 255).astype(np.uint8)
-        order = np.argsort(tri[idx, :, 2].mean(axis=1))  # de atrás hacia delante
+        order = np.argsort(tri[idx, :, 2].mean(axis=1))  # back to front
 
         xy = tri[idx][:, :, :2]
         screen = np.empty_like(xy)

@@ -17,7 +17,7 @@ export function RemoveBgPage() {
   })
   const elapsed = useElapsed(!!job.active, job.since)
 
-  const incoming = inbox.quitar_fondo
+  const incoming = inbox.remove_bg
   useEffect(() => {
     if (incoming) setSource(incoming.path)
   }, [incoming])
@@ -26,12 +26,12 @@ export function RemoveBgPage() {
     <Workbench
       controls={
         <>
-          <ImageSource label="Imagen" value={source} onChange={setSource} last={lastGenerated} />
+          <ImageSource label="Image" value={source} onChange={setSource} last={lastGenerated} />
           <p className="text-xs leading-relaxed text-muted">
-            Funciona mejor con personajes y objetos sobre fondo liso, que es como salen de Crear.
+            Works best with characters and objects on a plain background, which is how they come out of Create.
           </p>
           <RunBar
-            label="Quitar fondo"
+            label="Remove background"
             icon={<Scissors size={18} />}
             running={job.running}
             queued={job.queued + (job.active ? 1 : 0)}
@@ -48,9 +48,9 @@ export function RemoveBgPage() {
           running={job.running}
           progress={job.progress}
           elapsed={elapsed}
-          exclude="quitar_fondo"
-          emptyTitle="Aquí aparecerá el PNG transparente"
-          emptyHint="Se guarda en generated_transparent, listo para usarlo como asset o pasarlo a Modelo 3D."
+          exclude="remove_bg"
+          emptyTitle="Your transparent PNG will appear here"
+          emptyHint="Saved to generated_transparent, ready to use as an asset or to send to 3D Model."
         />
       }
     />

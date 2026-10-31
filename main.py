@@ -1,5 +1,5 @@
-"""Arranca la app en el navegador: servidor local (app/server.py) + frontend
-compilado de web/dist."""
+"""Launch the app in the browser: local server (app/server.py) + the
+compiled frontend from web/dist."""
 
 import threading
 import webbrowser

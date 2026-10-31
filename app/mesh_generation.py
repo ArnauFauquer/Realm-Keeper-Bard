@@ -1,8 +1,9 @@
-"""Workflow imagen → malla 3D imprimible (STL) con Pixal3D.
+"""Workflow image → printable 3D mesh (STL) with Pixal3D.
 
-La inferencia la hace trellis.cpp (C++/CUDA) y el post-proceso de la malla un
-worker en el entorno aparte `models_3d/venv` (trimesh + pymeshlab). Aquí solo
-se lanza `models_3d/workers/run3d.py` como subproceso y se interpreta su salida.
+Inference is done by trellis.cpp (C++/CUDA) and mesh post-processing by a
+worker in the separate `models_3d/venv` environment (trimesh + pymeshlab). This
+module only launches `models_3d/workers/run3d.py` as a subprocess and parses
+its output.
 """
 
 import json
@@ -17,13 +18,13 @@ from typing import Callable
 from .config import MODELS_3D_OUTPUT_DIR, MODELS_3D_PYTHON, MODELS_3D_WORKER
 
 
-# Preparación de la imagen con FLUX 3 (motor local) antes de la malla:
-# "detailed" = escultura gris de alto detalle (style_3d del perfil), "clay" =
-# arcilla lisa (PREPARE_3D_PROMPT), "none" = se usa la imagen tal cual.
+# Image preparation with FLUX 3 (local engine) before meshing:
+# "detailed" = highly detailed grey sculpture (profile's style_3d), "clay" =
+# smooth clay (PREPARE_3D_PROMPT), "none" = use the image as is.
 MESH_PREPARE_MODES = (
-    ("Sin preparar", "none"),
-    ("Escultura detallada", "detailed"),
-    ("Arcilla lisa", "clay"),
+    ("No preparation", "none"),
+    ("Detailed sculpture", "detailed"),
+    ("Smooth clay", "clay"),
 )
 
 
@@ -39,14 +40,14 @@ def environment_ready() -> bool:
 
 
 def random_seed() -> int:
-    """Cada malla usa una semilla nueva: las variantes son interpretaciones
-    distintas de lo que no se ve en la imagen."""
+    """Every mesh uses a fresh seed: variants are different interpretations
+    of whatever the image does not show."""
     return secrets.randbelow(2**31)
 
 
 def start_mesh_generation(image_path: str, options: Mesh3DOptions) -> subprocess.Popen:
-    # quita el sello de tiempo de los nombres generados por la app
-    name = re.sub(r"_\d{8}_\d{6}(_\d+)?$", "", Path(image_path).stem)[:48] or "modelo"
+    # strip the timestamp from app-generated file names
+    name = re.sub(r"_\d{8}_\d{6}(_\d+)?$", "", Path(image_path).stem)[:48] or "model"
     cmd = [
         str(MODELS_3D_PYTHON), "-u", str(MODELS_3D_WORKER),
         "--image", str(Path(image_path).resolve()),
@@ -69,8 +70,8 @@ def start_mesh_generation(image_path: str, options: Mesh3DOptions) -> subprocess
 
 
 def run_mesh_generation(proc: subprocess.Popen, on_progress: Callable[[str], None]) -> dict:
-    """Lee la salida del worker hasta que termina. Devuelve el dict RESULT o
-    lanza RuntimeError con el mensaje de error y las últimas líneas del log."""
+    """Read the worker output until it exits. Return the RESULT dict or raise
+    RuntimeError with the error message and the last log lines."""
     result = None
     error = None
     tail: list[str] = []
@@ -89,4 +90,4 @@ def run_mesh_generation(proc: subprocess.Popen, on_progress: Callable[[str], Non
     if result is not None and code == 0:
         return result
     detail = "\n".join(tail[-12:])
-    raise RuntimeError(f"{error or 'El proceso terminó con código ' + str(code)}\n\n{detail}")
+    raise RuntimeError(f"{error or 'The process exited with code ' + str(code)}\n\n{detail}")

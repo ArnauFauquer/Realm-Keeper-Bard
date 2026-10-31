@@ -5,9 +5,9 @@ import { IconButton } from './ui'
 const MIN = 0.05
 const MAX = 8
 
-/** Visor con zoom (rueda, centrado en el cursor) y desplazamiento (arrastrar),
- *  para revisar el detalle de las imágenes a resolución completa. La posición
- *  se escribe directamente en el estilo: solo el % de zoom pasa por React. */
+/** Viewer with zoom (wheel, centred on the cursor) and panning (drag),
+ *  for inspecting image detail at full resolution. The position is written
+ *  straight to the style: only the zoom % goes through React. */
 export function ImageViewer({ src, alt }: { src: string; alt: string }) {
   const box = useRef<HTMLDivElement>(null)
   const img = useRef<HTMLImageElement>(null)
@@ -101,14 +101,14 @@ export function ImageViewer({ src, alt }: { src: string; alt: string }) {
         />
       </div>
       <div className="absolute bottom-3 left-3 flex items-center gap-0.5 rounded-full border border-line bg-surface/90 px-1 py-0.5 backdrop-blur">
-        <IconButton label="Alejar" onClick={() => zoomAt(1 / 1.25)} className="size-8 rounded-full">
+        <IconButton label="Zoom out" onClick={() => zoomAt(1 / 1.25)} className="size-8 rounded-full">
           <MagnifyingGlassMinus size={16} />
         </IconButton>
         <span className="w-12 text-center font-mono text-xs tabular-nums text-muted">{Math.round(zoom * 100)}%</span>
-        <IconButton label="Acercar" onClick={() => zoomAt(1.25)} className="size-8 rounded-full">
+        <IconButton label="Zoom in" onClick={() => zoomAt(1.25)} className="size-8 rounded-full">
           <MagnifyingGlassPlus size={16} />
         </IconButton>
-        <IconButton label="Ajustar a la vista" onClick={fit} className="size-8 rounded-full">
+        <IconButton label="Fit to view" onClick={fit} className="size-8 rounded-full">
           <CornersOut size={16} />
         </IconButton>
       </div>

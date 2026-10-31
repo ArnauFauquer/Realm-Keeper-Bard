@@ -4,9 +4,9 @@ import { Select } from '../components/ui'
 
 const NO_SPECIES = ''
 
-/** Plantilla de estilo y de anatomía elegidas en una página. Mientras no se
- *  toca el desplegable sigue la plantilla por defecto de Ajustes; si la elegida
- *  se borra, vuelve a la de por defecto. */
+/** Style and anatomy templates chosen on a page. Until the dropdown is
+ *  touched it follows the default template from Settings; if the chosen one is
+ *  deleted, it falls back to the default. */
 export function usePresetChoice() {
   const { library } = useApp()
   const [style, setStyle] = useState<string | null>(null)
@@ -40,30 +40,30 @@ export function PresetSelects({
     <div className="grid gap-4">
       {isMap ? (
         <p className="text-xs leading-relaxed text-muted">
-          Los mapas usan el estilo de mapa común de Ajustes, no una plantilla de estilo.
+          Maps use the shared map style from Settings, not a style template.
         </p>
       ) : (
         <Select
-          label="Estilo"
+          label="Style"
           value={choice.styleId}
           onChange={choice.setStyle}
           options={library.styles.map((s) => ({
             value: s.id,
-            label: s.id === library.active_style ? `${s.name} (por defecto)` : s.name,
+            label: s.id === library.active_style ? `${s.name} (default)` : s.name,
           }))}
         />
       )}
       {withSpecies && (
         <Select
-          label="Anatomía"
+          label="Anatomy"
           value={choice.speciesId}
           onChange={choice.setSpecies}
           options={[
             ...library.species.map((s) => ({
               value: s.id,
-              label: s.id === library.active_species ? `${s.name} (por defecto)` : s.name,
+              label: s.id === library.active_species ? `${s.name} (default)` : s.name,
             })),
-            { value: NO_SPECIES, label: 'Sin anatomía' },
+            { value: NO_SPECIES, label: 'No anatomy' },
           ]}
         />
       )}

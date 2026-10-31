@@ -1,4 +1,4 @@
-"""Utilidades de imagen compartidas (adaptadas de code_resources/app.py)."""
+"""Shared image utilities."""
 
 import mimetypes
 from datetime import datetime

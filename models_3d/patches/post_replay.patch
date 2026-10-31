@@ -7,8 +7,8 @@ index eeabc4e..9256843 100644
      if (!f) { fprintf(stderr, "cannot open %s\n", dump); return 1; }
      int V, F, Mv, res;
 -    if (fread(&V,4,1,f)+fread(&F,4,1,f)+fread(&Mv,4,1,f)+fread(&res,4,1,f) != 4) return 1;
-+    // lecturas en orden explícito: en `fread(&V)+fread(&F)+...` el orden de
-+    // evaluación no está definido y MSVC lo hace de derecha a izquierda
++    // reads in explicit order: in `fread(&V)+fread(&F)+...` the evaluation
++    // order is undefined and MSVC does it right to left
 +    size_t nh = fread(&V,4,1,f);
 +    nh += fread(&F,4,1,f);
 +    nh += fread(&Mv,4,1,f);

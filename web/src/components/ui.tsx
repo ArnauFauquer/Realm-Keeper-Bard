@@ -166,7 +166,7 @@ export function Segmented<T extends string>({
   onChange: (v: T) => void
   options: { value: T; label: string; icon?: ReactNode }[]
   label: string
-  /** Icono encima del texto: cabe en columnas estrechas sin recortar etiquetas. */
+  /** Icon above the text: fits narrow columns without clipping labels. */
   stacked?: boolean
 }) {
   return (

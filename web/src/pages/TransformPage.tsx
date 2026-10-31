@@ -9,7 +9,7 @@ import { useElapsed, useJob } from '../useJob'
 import { PresetSelects, usePresetChoice } from './presetChoice'
 import { RunBar, useResults, Workbench } from './Workbench'
 
-/** Proporción 'w / h' de la imagen de referencia: el resultado sale con la misma. */
+/** 'w / h' aspect ratio of the reference image: the result comes out the same. */
 function useImageAspect(path: string | null) {
   const [aspect, setAspect] = useState<string | undefined>()
   useEffect(() => {
@@ -40,7 +40,7 @@ export function TransformPage() {
   })
   const elapsed = useElapsed(!!job.active, job.since)
 
-  const incoming = inbox.transformar
+  const incoming = inbox.transform
   useEffect(() => {
     if (incoming) setReference(incoming.path)
   }, [incoming])
@@ -49,32 +49,32 @@ export function TransformPage() {
     <Workbench
       controls={
         <>
-          <ImageSource label="Imagen de referencia" value={reference} onChange={setReference} last={lastGenerated} />
+          <ImageSource label="Reference image" value={reference} onChange={setReference} last={lastGenerated} />
           <Toggle
             checked={isMap}
             onChange={setIsMap}
-            label="Es un mapa"
-            hint="Usa el estilo de mapa de Ajustes en vez de una plantilla de estilo."
+            label="It is a map"
+            hint="Uses the map style from Settings instead of a style template."
           />
           <PresetSelects isMap={isMap} withSpecies={!isMap} choice={preset} />
           {!isMap && (
             <p className="-mt-2 text-xs leading-relaxed text-muted">
-              La anatomía rehace el cuerpo del personaje con el de la especie. Para objetos y fondos elige «Sin
-              anatomía».
+              Anatomy redraws the character body to match the species. For objects and backgrounds choose “No
+              anatomy”.
             </p>
           )}
           <TextArea
-            label="Detalles adicionales"
+            label="Additional details"
             minRows={3}
             value={extra}
-            placeholder="Opcional. Por ejemplo: que lleve la capa verde en vez de azul."
+            placeholder="Optional. For example: make the cape green instead of blue."
             onChange={(e) => setExtra(e.target.value)}
           />
           <div className="grid gap-2">
-            <Toggle checked={removeBg} onChange={setRemoveBg} label="Quitar el fondo al terminar" />
+            <Toggle checked={removeBg} onChange={setRemoveBg} label="Remove the background when done" />
           </div>
           <RunBar
-            label="Transformar al estilo"
+            label="Transform to style"
             icon={<MagicWand size={18} />}
             running={job.running}
             queued={job.queued + (job.active ? 1 : 0)}
@@ -105,9 +105,9 @@ export function TransformPage() {
           progress={job.progress}
           elapsed={elapsed}
           aspect={aspect}
-          exclude="transformar"
-          emptyTitle="Aquí aparecerá la versión redibujada"
-          emptyHint="Sube una imagen y se redibuja con el estilo de tu mundo, conservando quién o qué es."
+          exclude="transform"
+          emptyTitle="The redrawn version will appear here"
+          emptyHint="Upload an image and it is redrawn in your world style, keeping who or what it is."
         />
       }
     />

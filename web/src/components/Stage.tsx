@@ -16,10 +16,10 @@ import { MeshViewer } from './MeshViewer'
 import { Button, cx, IconButton, Panel } from './ui'
 
 const ASPECT: Record<string, string> = {
-  personaje: '9 / 16',
-  fondo: '16 / 9',
-  objeto: '1 / 1',
-  mapa: '3 / 2',
+  character: '9 / 16',
+  background: '16 / 9',
+  object: '1 / 1',
+  map: '3 / 2',
 }
 
 export function itemKey(item: ResultItem) {
@@ -32,9 +32,9 @@ function itemThumb(item: ResultItem) {
 }
 
 const SEND_LABELS: Record<SendTarget, { label: string; icon: ReactNode }> = {
-  transformar: { label: 'Transformar', icon: <MagicWand size={16} /> },
-  quitar_fondo: { label: 'Quitar fondo', icon: <Scissors size={16} /> },
-  modelo_3d: { label: 'Modelo 3D', icon: <Cube size={16} /> },
+  transform: { label: 'Transform', icon: <MagicWand size={16} /> },
+  remove_bg: { label: 'Remove background', icon: <Scissors size={16} /> },
+  model_3d: { label: '3D Model', icon: <Cube size={16} /> },
 }
 
 export function SendActions({ path, exclude, onSent }: { path: string; exclude?: SendTarget; onSent?: () => void }) {
@@ -58,10 +58,10 @@ export function SendActions({ path, exclude, onSent }: { path: string; exclude?:
 
 function MeshFacts({ item }: { item: Extract<ResultItem, { kind: 'mesh' }> }) {
   const facts = [
-    item.faces != null && `${item.faces.toLocaleString('es-ES')} caras`,
+    item.faces != null && `${item.faces.toLocaleString('en-US')} faces`,
     item.size_mm && `${item.size_mm.map((v) => Math.round(v * 10) / 10).join(' × ')} mm`,
-    item.watertight != null && (item.watertight ? 'Malla cerrada' : 'Malla con defectos menores'),
-    item.filled && 'Maciza',
+    item.watertight != null && (item.watertight ? 'Watertight mesh' : 'Mesh with minor defects'),
+    item.filled && 'Solid',
     item.seed != null && `Semilla ${item.seed}`,
     item.seconds != null && `${Math.round(item.seconds)} s`,
   ].filter(Boolean) as string[]
@@ -97,7 +97,7 @@ export function Stage({
   progress: string
   elapsed: number
   category?: string
-  /** Proporción del hueco de espera ('w / h'); si no, la de la categoría. */
+  /** Aspect ratio of the placeholder ('w / h'); otherwise the category's. */
   aspect?: string
   emptyTitle: string
   emptyHint: string
@@ -106,14 +106,14 @@ export function Stage({
   return (
     <Panel className="flex min-h-[520px] min-w-0 flex-col overflow-hidden lg:h-full">
       <div className="flex min-h-14 flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2">
-        <p className="min-w-0 truncate font-mono text-xs text-muted">{selected ? selected.name : 'Sin resultado todavía'}</p>
+        <p className="min-w-0 truncate font-mono text-xs text-muted">{selected ? selected.name : 'No result yet'}</p>
         {selected && (
           <div className="flex flex-wrap items-center gap-1">
             {selected.kind === 'image' ? (
               <>
                 <SendActions path={selected.path} exclude={exclude} />
                 <span className="mx-1 h-5 w-px bg-line" />
-                <IconButton label="Abrir con Windows" onClick={() => api.open(selected.path)}>
+                <IconButton label="Open with Windows" onClick={() => api.open(selected.path)}>
                   <ArrowSquareOut size={18} />
                 </IconButton>
                 <a
@@ -130,13 +130,13 @@ export function Stage({
               <>
                 {selected.stl && (
                   <Button variant="ghost" className="h-9 px-3" onClick={() => api.open(selected.stl!)}>
-                    <ArrowSquareOut size={16} /> Abrir STL
+                    <ArrowSquareOut size={16} /> Open STL
                   </Button>
                 )}
                 <Button variant="ghost" className="h-9 px-3" onClick={() => api.open(selected.glb)}>
-                  <ArrowSquareOut size={16} /> Abrir GLB
+                  <ArrowSquareOut size={16} /> Open GLB
                 </Button>
-                <IconButton label="Abrir carpeta de modelos" onClick={() => api.open('generated_3d')}>
+                <IconButton label="Open models folder" onClick={() => api.open('generated_3d')}>
                   <FolderOpen size={18} />
                 </IconButton>
               </>
@@ -249,7 +249,7 @@ function Pending({ ratio, progress, elapsed }: { ratio: string; progress: string
   const [w, h] = ratio.split('/').map(Number)
   return (
     <div className="flex h-full w-full flex-col items-center gap-4 py-2">
-      {/* contenedor con unidades cq: el hueco cabe entero respetando la proporción */}
+      {/* container with cq units: the placeholder fits whole while keeping its aspect ratio */}
       <div className="flex min-h-0 w-full flex-1 items-center justify-center [container-type:size]">
         <div
           className="shimmer relative overflow-hidden rounded-[10px] bg-surface-2"

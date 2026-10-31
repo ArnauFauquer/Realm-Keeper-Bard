@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react'
 import type { ResultItem } from '../api'
 import { Button, Panel } from '../components/ui'
 
-/** Resultados de la sesión de una página: el último queda seleccionado. */
+/** Session results of a page: the latest one stays selected. */
 export function useResults() {
   const [items, setItems] = useState<ResultItem[]>([])
   const [selected, setSelected] = useState<ResultItem | null>(null)
@@ -15,7 +15,7 @@ export function useResults() {
   return { items, selected, setSelected, add }
 }
 
-/** Columna de controles + escenario de resultado; en móvil se apilan. */
+/** Controls column + result stage; stacked on mobile. */
 export function Workbench({ controls, stage }: { controls: ReactNode; stage: ReactNode }) {
   return (
     <div className="grid gap-5 lg:h-[calc(100dvh-10.5rem)] lg:grid-cols-[minmax(340px,400px)_minmax(0,1fr)]">
@@ -40,7 +40,7 @@ export function RunBar({
 }: {
   label: string
   icon: ReactNode
-  /** Hay trabajos de esta página en marcha o en cola: el botón sigue activo y encola otro. */
+  /** This page has jobs running or queued: the button stays active and queues another. */
   running: boolean
   queued?: number
   disabled?: boolean
@@ -54,18 +54,18 @@ export function RunBar({
       <div className="flex gap-2">
         <Button variant="primary" className="h-11 flex-1" disabled={disabled} onClick={onRun}>
           {running ? <Queue size={18} /> : icon}
-          {running ? 'Añadir a la cola' : label}
+          {running ? 'Add to queue' : label}
         </Button>
         {onCancel && running && (
-          <Button variant="danger" className="h-11" onClick={onCancel} title="Cancela el que está en marcha">
-            <Stop size={16} weight="fill" /> Cancelar
+          <Button variant="danger" className="h-11" onClick={onCancel} title="Cancels the running one">
+            <Stop size={16} weight="fill" /> Cancel
           </Button>
         )}
       </div>
       {running && queued > 0 && (
         <p className="text-xs text-muted">
-          {queued === 1 ? '1 trabajo de esta sección' : `${queued} trabajos de esta sección`} en la cola. Puedes seguir
-          cambiando los ajustes y encolar más.
+          {queued === 1 ? '1 job from this section' : `${queued} jobs from this section`} in the queue. You can keep
+          changing the settings and queue more.
         </p>
       )}
       {error && (

@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, jobActive, type Job, type ResultItem } from './api'
 import { useApp } from './appContext'
 
-/** Trabajos lanzados desde una página. Se pueden encolar varios: el servidor los
- *  ejecuta en orden y `onResult` recibe cada resultado nuevo en cuanto aparece
- *  (las variantes 3D llegan de una en una). */
+/** Jobs launched from a page. Several can be queued: the server runs them in
+ *  order and `onResult` receives each new result as soon as it appears
+ *  (3D variants arrive one at a time). */
 export function useJob(onResult: (item: ResultItem) => void) {
   const { jobs, trackJob } = useApp()
   const [mine, setMine] = useState<string[]>([])
@@ -31,8 +31,8 @@ export function useJob(onResult: (item: ResultItem) => void) {
   const latestStarted = myJobs.at(-1)
 
   let progress = ''
-  if (active) progress = (active.progress || 'Trabajando...') + (queued.length ? ` · ${queued.length} más en cola` : '')
-  else if (queued.length) progress = `En cola · puesto ${queued[0].position}` + (queued.length > 1 ? ` (+${queued.length - 1})` : '')
+  if (active) progress = (active.progress || 'Working...') + (queued.length ? ` · ${queued.length} more queued` : '')
+  else if (queued.length) progress = `Queued · position ${queued[0].position}` + (queued.length > 1 ? ` (+${queued.length - 1})` : '')
 
   const start = useCallback(
     async (launch: () => Promise<Job>) => {
@@ -52,10 +52,10 @@ export function useJob(onResult: (item: ResultItem) => void) {
     if (active) trackJob(await api.cancel(active.id))
   }, [active, trackJob])
 
-  // el error/aviso solo se enseña si es del último trabajo lanzado
+  // the error/notice is shown only if it belongs to the last launched job
   const shown = latest && latest === latestStarted ? latest : null
   return {
-    /** Hay algo en marcha o en cola desde esta página. */
+    /** Something is running or queued from this page. */
     running: !!active || queued.length > 0,
     active,
     queued: queued.length,
@@ -68,7 +68,7 @@ export function useJob(onResult: (item: ResultItem) => void) {
   }
 }
 
-/** Segundos transcurridos mientras `active` es true. */
+/** Seconds elapsed while `active` is true. */
 export function useElapsed(active: boolean, since?: number) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {

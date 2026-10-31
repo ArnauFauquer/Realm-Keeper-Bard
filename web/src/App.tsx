@@ -25,52 +25,52 @@ import { TransformPage } from './pages/TransformPage'
 
 const PAGES: { key: PageKey; label: string; title: string; subtitle: string; icon: ReactNode }[] = [
   {
-    key: 'crear',
-    label: 'Crear',
-    title: 'Crear',
-    subtitle: 'Un personaje, un fondo, un objeto o un mapa nuevo, con el estilo de tu mundo.',
+    key: 'create',
+    label: 'Create',
+    title: 'Create',
+    subtitle: 'A new character, background, object or map, in your world style.',
     icon: <PaintBrush size={18} />,
   },
   {
-    key: 'transformar',
-    label: 'Transformar',
-    title: 'Transformar al estilo',
-    subtitle: 'Redibuja una imagen de referencia con tu estilo, conservando su identidad.',
+    key: 'transform',
+    label: 'Transform',
+    title: 'Transform to style',
+    subtitle: 'Redraw a reference image in your style, keeping its identity.',
     icon: <MagicWand size={18} />,
   },
   {
-    key: 'quitar_fondo',
-    label: 'Quitar fondo',
-    title: 'Quitar fondo',
-    subtitle: 'Convierte una imagen en un PNG transparente, listo para usar como asset.',
+    key: 'remove_bg',
+    label: 'Remove background',
+    title: 'Remove background',
+    subtitle: 'Turn an image into a transparent PNG, ready to use as an asset.',
     icon: <Scissors size={18} />,
   },
   {
-    key: 'modelo_3d',
-    label: 'Modelo 3D',
-    title: 'Modelo 3D',
-    subtitle: 'Convierte una imagen en una miniatura imprimible (STL).',
+    key: 'model_3d',
+    label: '3D Model',
+    title: '3D Model',
+    subtitle: 'Turn an image into a printable miniature (STL).',
     icon: <Cube size={18} />,
   },
   {
-    key: 'biblioteca',
-    label: 'Biblioteca',
-    title: 'Biblioteca',
-    subtitle: 'Todo lo que has generado, de lo más reciente a lo más antiguo.',
+    key: 'library',
+    label: 'Library',
+    title: 'Library',
+    subtitle: 'Everything you have generated, newest to oldest.',
     icon: <Images size={18} />,
   },
   {
-    key: 'ajustes',
-    label: 'Ajustes de estilo',
-    title: 'Ajustes de estilo',
-    subtitle: 'Tus plantillas de estilo y de anatomía, y los ajustes comunes a todas.',
+    key: 'settings',
+    label: 'Style settings',
+    title: 'Style settings',
+    subtitle: 'Your style and anatomy templates, and the settings shared by all.',
     icon: <SlidersHorizontal size={18} />,
   },
 ]
 
 const pageFromHash = (): PageKey => {
   const key = window.location.hash.replace('#/', '') as PageKey
-  return PAGES.some((p) => p.key === key) ? key : 'crear'
+  return PAGES.some((p) => p.key === key) ? key : 'create'
 }
 
 type Theme = 'auto' | 'light' | 'dark'
@@ -90,7 +90,7 @@ function useTheme() {
     try {
       localStorage.setItem('rkb-theme', theme)
     } catch {
-      /* almacenamiento bloqueado: solo se pierde la preferencia */
+      /* storage blocked: only the preference is lost */
     }
   }, [theme])
   const next = () => setTheme((t) => (t === 'auto' ? 'dark' : t === 'dark' ? 'light' : 'auto'))
@@ -105,7 +105,7 @@ const ENGINE_TONE: Record<EngineInfo['status'], string> = {
 }
 
 function EngineCard() {
-  const [engine, setEngine] = useState<EngineInfo>({ status: 'starting', message: 'Conectando...' })
+  const [engine, setEngine] = useState<EngineInfo>({ status: 'starting', message: 'Connecting...' })
   const [offline, setOffline] = useState(false)
 
   useEffect(() => {
@@ -129,31 +129,31 @@ function EngineCard() {
     }
   }, [])
 
-  const info = offline ? { status: 'error' as const, message: 'Sin conexión con el servidor de la app.' } : engine
+  const info = offline ? { status: 'error' as const, message: 'No connection to the app server.' } : engine
 
   return (
     <div className="grid gap-3 rounded-2xl border border-line bg-bg p-3.5">
       <div className="flex items-center gap-2">
         <Lightning size={16} className="text-muted" />
-        <span className="text-sm font-medium text-fg">Motor local</span>
+        <span className="text-sm font-medium text-fg">Local engine</span>
         <span
           className={cx('ml-auto size-2 rounded-full', ENGINE_TONE[info.status])}
-          aria-label={`Estado: ${info.status}`}
+          aria-label={`Status: ${info.status}`}
         />
       </div>
       <p className="text-xs leading-relaxed text-muted">{info.message}</p>
-      <p className="text-[11px] leading-relaxed text-muted/80">Crear con Krea 2. Editar con FLUX 3.</p>
+      <p className="text-[11px] leading-relaxed text-muted/80">Create with Krea 2. Edit with FLUX 3.</p>
       {(info.status === 'stopped' || info.status === 'error') && !offline && (
         <Button className="h-9" onClick={async () => setEngine(await api.startEngine())}>
-          Arrancar motor
+          Start engine
         </Button>
       )}
     </div>
   )
 }
 
-/** Cola del servidor: se consulta cada segundo mientras hay algo pendiente y,
- *  si no, de vez en cuando (por si se encoló desde otra pestaña). */
+/** Server queue: polled every second while something is pending and,
+ *  otherwise, now and then (in case it was queued from another tab). */
 function useJobs() {
   const [jobs, setJobs] = useState<Job[]>([])
   const busy = useRef(false)
@@ -169,7 +169,7 @@ function useJobs() {
         const list = await api.jobs()
         if (alive) setJobs(list)
       } catch {
-        /* servidor caído: EngineCard ya lo avisa */
+        /* server down: EngineCard already reports it */
       }
       if (alive) timer = window.setTimeout(tick, busy.current ? 900 : 4000)
     }
@@ -250,21 +250,21 @@ export default function App() {
             <div className="flex items-center justify-between px-4 py-4 lg:block lg:px-5 lg:pb-6 lg:pt-6">
               <div>
                 <p className="text-[17px] font-semibold tracking-tight text-fg">RealmKeeper Bard</p>
-                <p className="text-xs text-muted">Forja de assets de D&amp;D</p>
+                <p className="text-xs text-muted">D&amp;D asset forge</p>
               </div>
               <button
                 type="button"
                 onClick={nextTheme}
                 className="inline-flex size-9 items-center justify-center rounded-[10px] text-muted hover:bg-surface-2 hover:text-fg lg:hidden"
-                aria-label={`Tema: ${theme}`}
+                aria-label={`Theme: ${theme}`}
               >
                 {theme === 'auto' ? <CircleHalf size={18} /> : theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
               </button>
             </div>
-            <nav aria-label="Secciones" className="scroll-thin overflow-x-auto px-3 pb-3 lg:overflow-visible lg:pb-0">
+            <nav aria-label="Sections" className="scroll-thin overflow-x-auto px-3 pb-3 lg:overflow-visible lg:pb-0">
               <ul className="flex gap-1 lg:grid">
                 {PAGES.map((p) => (
-                  <li key={p.key} className={p.key === 'biblioteca' ? 'lg:mt-4 lg:border-t lg:border-line lg:pt-4' : undefined}>
+                  <li key={p.key} className={p.key === 'library' ? 'lg:mt-4 lg:border-t lg:border-line lg:pt-4' : undefined}>
                     <button
                       type="button"
                       onClick={() => go(p.key)}
@@ -282,7 +282,7 @@ export default function App() {
                       {pending[p.key] && (
                         <span
                           className="ml-auto rounded-full bg-accent px-1.5 py-px font-mono text-[10px] leading-4 text-on-accent"
-                          aria-label={`${pending[p.key]} en la cola`}
+                          aria-label={`${pending[p.key]} in the queue`}
                         >
                           {pending[p.key]}
                         </span>
@@ -301,7 +301,7 @@ export default function App() {
                 className="flex h-9 items-center gap-2 rounded-[10px] px-3 text-xs text-muted hover:bg-surface-2 hover:text-fg"
               >
                 {theme === 'auto' ? <CircleHalf size={16} /> : theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
-                Tema: {theme === 'auto' ? 'automático' : theme === 'dark' ? 'oscuro' : 'claro'}
+                Theme: {theme === 'auto' ? 'auto' : theme === 'dark' ? 'dark' : 'light'}
               </button>
             </div>
           </aside>
@@ -312,24 +312,24 @@ export default function App() {
               <QueuePanel />
               <EngineCard />
             </div>
-            {/* Las páginas siguen montadas al cambiar de sección (como tkraise en la
-                GUI): no se pierden los textos, las imágenes ni los trabajos en marcha. */}
-            <div hidden={page !== 'crear'}>
+            {/* Pages stay mounted when switching sections: texts, images and
+                running jobs are not lost. */}
+            <div hidden={page !== 'create'}>
               <CreatePage />
             </div>
-            <div hidden={page !== 'transformar'}>
+            <div hidden={page !== 'transform'}>
               <TransformPage />
             </div>
-            <div hidden={page !== 'quitar_fondo'}>
+            <div hidden={page !== 'remove_bg'}>
               <RemoveBgPage />
             </div>
-            <div hidden={page !== 'modelo_3d'}>
+            <div hidden={page !== 'model_3d'}>
               <MeshPage />
             </div>
-            <div hidden={page !== 'biblioteca'}>
+            <div hidden={page !== 'library'}>
               <LibraryPage refreshKey={libraryVersion} />
             </div>
-            <div hidden={page !== 'ajustes'}>
+            <div hidden={page !== 'settings'}>
               <SettingsPage />
             </div>
           </main>
