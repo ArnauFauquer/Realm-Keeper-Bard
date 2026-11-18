@@ -7,7 +7,7 @@ COPY web/ ./
 RUN npm run build
 
 # ---- app: FastAPI + image engine (diffusers, CUDA) -----------------------------
-FROM python:3.12-slim
+FROM python:3.15-slim
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     DATA_DIR=/data
